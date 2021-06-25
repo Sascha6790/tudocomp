@@ -61,6 +61,8 @@ run_test(esp_tests      DEPS ${BASIC_DEPS})
 
 run_test(intsort_tests DEPS ${BASIC_DEPS})
 
+run_test(lz77_test  DEPS ${BASIC_DEPS})
+
 set(SANDBOX_CPP ${CMAKE_CURRENT_SOURCE_DIR}/sandbox_tests.cpp)
 if(NOT EXISTS ${SANDBOX_CPP})
     file(READ ${CMAKE_SOURCE_DIR}/etc/sandbox_tests.cpp.template SANDBOX_TEMPLATE)
