@@ -15,7 +15,8 @@
 #include <tudocomp/compressors/lzss/DidacticalCoder.hpp>
 #include <tudocomp/compressors/lzss/FactorizationStats.hpp>
 #include <tudocomp/compressors/esp/MonotoneSubsequences.hpp>
-#include "LZ77Helper.hpp"
+#include "tudocomp/compressors/lz77/LZ77Helper.hpp"
+#include <tudocomp/compressors/lz77/ds/WExponentialSearchTreeDS.hpp>
 
 namespace tdc {
     namespace lz77 {
@@ -45,6 +46,7 @@ namespace tdc {
             }
 
             inline void compress(Input &input, Output &output) override {
+                StatPhase root("Root");
                 // initialize encoder
                 tdc::lzss::DidacticalCoder::Encoder coder = lzss_coder_t(this->config().sub_config("coder")).encoder(
                         output,
@@ -62,6 +64,9 @@ namespace tdc {
                 // factorize
                 size_t positionInText = 0; // all symbols before positionInText have already been factorized
                 RingBuffer<uliteral_t> window(slidingWindowSize);
+
+
+                WExponentialSearchTreeDS * sa = new WExponentialSearchTreeDS(32, slidingWindowSize*2);
             }
 
             inline std::unique_ptr<Decompressor> decompressor() const override {
