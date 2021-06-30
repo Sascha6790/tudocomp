@@ -29,7 +29,7 @@ namespace tdc {
 
         public:
             inline static Meta meta() {
-                Meta m(Compressor::type_desc(), "LZ77Skeleton", "Compute LZ77 Factors using Compact Tries");
+                Meta m(Compressor::type_desc(), "LZ77Skeleton", "Compute LZ77 Factors using a skeleton");
                 m.param("coder", "The output encoder.").strategy<lzss_coder_t>(TypeDesc("lzss_coder"));
                 m.param("window", "The sliding window size").primitive(16);
                 m.param("threshold", "The minimum factor length.").primitive(2);
