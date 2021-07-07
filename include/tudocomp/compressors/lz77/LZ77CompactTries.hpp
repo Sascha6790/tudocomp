@@ -18,7 +18,7 @@
 #include <tudocomp/compressors/esp/MonotoneSubsequences.hpp>
 #include <divsufsort.h>
 #include "tudocomp/compressors/lz77/LZ77Helper.hpp"
-#include "tudocomp/compressors/lz77/ds/WExponentialSearchTree.hpp"
+#include "tudocomp/compressors/lz77/ds/SuffixTree.hpp"
 
 namespace tdc {
     namespace lz77 {

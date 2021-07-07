@@ -17,7 +17,7 @@ TEST(lz77, LZ77Skeleton)
 }
 
 TEST(lz77, LZ77CompactTries) {
-    const std::string input = "abcccccccde";
+    const std::string input = "banana$";
     auto result = test::compress<lz77::LZ77CompactTries<lzss::DidacticalCoder>>(input, "window=3");
     std::cout << std::left << std::setw(22) << std::setfill(' ') << result.str;
     ASSERT_EQ(result.str, "");
@@ -39,7 +39,7 @@ TEST(lz77, WExponentialSearchTree_banana$) {
 TEST(lz77, WExponentialSearchTree_mississippi$) {
     char buffer[] = "mississippi$$$$$$$$$$$$$$$$$$";
     size_t window = 12;
-    auto *pSearchTree = new lz77::WExponentialSearchTree(8);
+    auto *pSearchTree = new lz77::SuffixTree(8);
     for (unsigned int i = 0; i < window; i++) {
         pSearchTree->add(&buffer[i], window);
     }
@@ -62,7 +62,7 @@ TEST(lz77, WExponentialSearchTree_ABAB) {
 TEST(lz77, WExponentialSearchTree_GTCCGAAGCTCCGG$) {
     char buffer[] = "GTCCGAAGCTCCGG$$$$$$$$$$$$$$$$$";
     size_t window = 15;
-    auto *pSearchTree = new lz77::WExponentialSearchTree(8);
+    auto *pSearchTree = new lz77::SuffixTree(8);
     for (unsigned int i = 0; i < window; i++) {
         pSearchTree->add(&buffer[i], window);
     }
