@@ -33,6 +33,7 @@ namespace tdc {
             int *inverseSuffixArray;
             int *lcp;
             int i, j, h;
+            int dsSize, bufSize;
 
         public:
             inline static Meta meta() {
@@ -49,6 +50,19 @@ namespace tdc {
             inline explicit LZ77CompactTries(Config &&c) : Compressor(std::move(c)) {
                 minFactorLength = this->config().param("threshold").as_uint();
                 windowSize = this->config().param("window").as_uint();
+
+                // Divide Text S into blocks of length w
+                // | ---- block 1 ---- | ---- block 2 ---- |
+                // Build Patricia Tree where each suffix has a fixed length of w
+                // Having a Patricia Tree with a static suffix length requires to build a Patricia Tree with an input of size 2w and truncating each suffix at length w
+                // This requires a look ahead of length w. block 1 uses block 2 as look-ahead buffer
+                // | ---- block 1 ---- | ---- block 2 ---- | ---- l-ahead ---- |
+                // Since we don't want to deal with three buffers, we'll just use one buffer with a size of 3w.
+                bufSize = 3 * windowSize + 1; // +1 for terminating bit
+                dsSize = 2 * windowSize;
+                suffixArray = new int[dsSize];
+                inverseSuffixArray = new int[dsSize];
+                lcp = new int[dsSize];
             }
 
             inline void compress(Input &input, Output &output) override {
@@ -62,24 +76,7 @@ namespace tdc {
                 coder.encode_header();
 
                 tdc::io::InputStream stream = input.as_stream();
-
-
-                // Divide Text S into blocks of length w
-                // | ---- block 1 ---- | ---- block 2 ---- |
-                // Build Patricia Tree where each suffix has a fixed length of w
-                // Having a Patricia Tree with a static suffix length requires to build a Patricia Tree with an input of size 2w and truncating each suffix at length w
-                // This requires a look ahead of length w. block 1 uses block 2 as look-ahead buffer
-                // | ---- block 1 ---- | ---- block 2 ---- | ---- l-ahead ---- |
-                // Since we don't want to deal with three buffers, we'll just use one buffer with a size of 3w.
-                // RingBuffer<uliteral_t> buffer(3*windowSize);
-                int bufSize = 3 * windowSize + 1; // +1 for terminating bit
-                int dsSize = 2 * windowSize;
                 char *buffer = new char[bufSize];
-                suffixArray = new int[dsSize];
-                inverseSuffixArray = new int[dsSize];
-                lcp = new int[dsSize];
-
-                assert(buffer);
 
                 while (stream.good()) {
                     std::cout << "Stream id good" << std::endl;
@@ -89,8 +86,9 @@ namespace tdc {
                         std::cout << "EOF" << std::endl;
                     } else {
                         //SA-Block-1
-                        constructSaFromBuffer(buffer, dsSize);
-                        constructLcpFromSa(buffer, dsSize);
+                        constructSuffixArray(buffer, dsSize);
+                        constructInverseSuffixArray();
+                        constructLcp(buffer, dsSize);
 
                         debug(dsSize);
                     }
@@ -100,6 +98,12 @@ namespace tdc {
                 std::cout << "Cleanup" << std::endl;
                 delete[] buffer;
                 delete[] suffixArray;
+            }
+
+            void constructInverseSuffixArray() {
+                for (i = 0; i < dsSize; i++) {
+                    inverseSuffixArray[suffixArray[i]] = i;
+                }
             }
 
             void debug(int dsSize) {
@@ -116,15 +120,12 @@ namespace tdc {
                 }
             }
 
-            void constructSuffixArray(const char *buffer, int dsSize) const { divsufsort(reinterpret_cast<const sauchar_t *> (buffer),
-                                                                                         suffixArray, dsSize); }
+            void constructSuffixArray(const char *buffer, int dsSize) const {
+                divsufsort(reinterpret_cast<const sauchar_t *> (buffer),
+                           suffixArray, dsSize);
+            }
 
             void constructLcp(const char *buffer, int dsSize) {
-
-                for (i = 0; i < dsSize; i++) {
-                    inverseSuffixArray[suffixArray[i]] = i;
-                }
-
                 h = 0;
                 lcp[0] = 0;
                 // calculate height
