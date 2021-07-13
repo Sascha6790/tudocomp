@@ -4,27 +4,22 @@
 #include <concepts>
 #include <tudocomp/compressors/lz77/ds/model/Node.hpp>
 
-/**
- * Nodes are classified in NodeType::HEAVY and NodeType::LIGHT
- * Nodes are of type HEAVY if they have at least \Theta(lg^2 lg \sigma) =: heavyThreshold leaves.
- */
 namespace tdc::lz77 {
 
     template<typename T> requires std::integral<T>
-    class SuffixTree {
+    class WeightedSuffixTree {
         int *lcpArray;
         int *suffixArray;
         const char *buffer;
         int size;
         Node<T> *root;
         int currentIteration = 0;
-
-
     public:
-        SuffixTree(int *lcpArray, int *suffixArray, const char *buffer, const int size) : lcpArray(lcpArray),
-                                                                                          suffixArray(suffixArray),
-                                                                                          buffer(buffer),
-                                                                                          size(size) {
+        WeightedSuffixTree(int *lcpArray, int *suffixArray, const char *buffer, const int size) : lcpArray(lcpArray),
+                                                                                                  suffixArray(
+                                                                                                          suffixArray),
+                                                                                                  buffer(buffer),
+                                                                                                  size(size) {
             root = new Node<T>(nullptr);
             root->rightmost = root;
 
@@ -43,7 +38,7 @@ namespace tdc::lz77 {
             }
         }
 
-        Node <T> *splitNode(Node <T> *deepestNode) const {
+        Node<T> *splitNode(Node<T> *deepestNode) const {
             Node<T> *v = deepestNode;
             Node<T> *w = deepestNode->rightmost;
 
@@ -58,7 +53,7 @@ namespace tdc::lz77 {
             return y;
         }
 
-        Node <T> * updateSplittedNode(Node <T> *w, Node <T> *y) const {
+        Node<T> *updateSplittedNode(Node<T> *w, Node<T> *y) const {
             w->edgeLabel = &buffer[suffixArray[currentIteration - 1] + lcpArray[currentIteration]];
             w->edgeLabelLength = (suffixArray[currentIteration - 1] + y->depth) -
                                  (suffixArray[currentIteration - 1] + lcpArray[currentIteration] - 1);
@@ -67,7 +62,7 @@ namespace tdc::lz77 {
             return w;
         }
 
-        Node <T> *getSplitMiddleNode(Node <T> *v) const {
+        Node<T> *getSplitMiddleNode(Node<T> *v) const {
             auto *y = new Node<T>(v);
             y->edgeLabel = &buffer[suffixArray[currentIteration - 1] + v->depth];
             y->edgeLabelLength = (suffixArray[currentIteration - 1] + lcpArray[currentIteration]) -
@@ -77,12 +72,13 @@ namespace tdc::lz77 {
             return y;
         }
 
-        virtual ~SuffixTree() {
+        virtual ~WeightedSuffixTree() {
             delete root;
         }
 
         void addLeaf(Node<T> *parent) {
-            parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]] = new Node(parent);
+            parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]] = new Node(
+                    parent);
             // latest child equals right-most
             root->rightmost = parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]];
             parent->rightmost = root->rightmost;

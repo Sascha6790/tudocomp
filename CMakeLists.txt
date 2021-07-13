@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.0.2 FATAL_ERROR)
+
 project (tudocomp)
+set (CMAKE_CXX_STANDARD 20)
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10.0)
+        message(FATAL_ERROR "GCC version must be at least 10.0!")
+    endif()
+endif()
 
 # init build system
 execute_process(COMMAND git submodule update --init -- build_system
