@@ -38,7 +38,7 @@ namespace tdc::lz77 {
             }
         }
 
-        WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) const {
+        WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) {
             WeightedNode<T> *v = deepestNode;
             WeightedNode<T> *w = deepestNode->rightmost;
 
@@ -53,16 +53,18 @@ namespace tdc::lz77 {
             return y;
         }
 
-        WeightedNode<T> *updateSplittedNode(WeightedNode<T> *w, WeightedNode<T> *y) const {
+        WeightedNode<T> *updateSplittedNode(WeightedNode<T> *w, WeightedNode<T> *y) {
+            w->parent = y;
             w->edgeLabel = &buffer[suffixArray[currentIteration - 1] + lcpArray[currentIteration]];
             w->edgeLabelLength = (suffixArray[currentIteration - 1] + y->depth) -
                                  (suffixArray[currentIteration - 1] + lcpArray[currentIteration] - 1);
             w->depth = y->depth + w->edgeLabelLength;
             y->childNodes[w->edgeLabel[0]] = w;
+            updateMinMaxBottomUp(w->parent, w->nodeLabel);
             return w;
         }
 
-        WeightedNode<T> *getSplitMiddleNode(WeightedNode<T> *v) const {
+        WeightedNode<T> *getSplitMiddleNode(WeightedNode<T> *v) {
             auto *y = new WeightedNode<T>(v);
             y->edgeLabel = &buffer[suffixArray[currentIteration - 1] + v->depth];
             y->edgeLabelLength = (suffixArray[currentIteration - 1] + lcpArray[currentIteration]) -
@@ -77,12 +79,13 @@ namespace tdc::lz77 {
         }
 
         void addLeaf(WeightedNode<T> *parent) {
-            parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]] = new Node(
+            parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]] = new WeightedNode(
                     parent);
             // latest child equals right-most
             root->rightmost = parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]];
             parent->rightmost = root->rightmost;
             setLabelsForLeaf(root->rightmost);
+            updateMinMaxBottomUp(root->rightmost, root->rightmost->nodeLabel);
         }
 
         void setLabelsForLeaf(WeightedNode<T> *leaf) {
@@ -90,6 +93,18 @@ namespace tdc::lz77 {
             leaf->edgeLabel = &buffer[suffixArray[currentIteration] + lcpArray[currentIteration]];
             leaf->edgeLabelLength = size - (suffixArray[currentIteration] + lcpArray[currentIteration]);
             leaf->depth = leaf->parent->depth + leaf->edgeLabelLength;
+        }
+
+        void updateMinMaxBottomUp(WeightedNode<T> *node, T label) {
+            if (label > node->maxLabel) {
+                node->maxLabel = label;
+            }
+            if (label < node->minLabel) {
+                node->minLabel = label;
+            }
+            if (node->parent != nullptr) {
+                updateMinMaxBottomUp(node->parent, label); // O(\sigma)
+            }
         }
 
         bool isDeepestNode(WeightedNode<T> *node) {

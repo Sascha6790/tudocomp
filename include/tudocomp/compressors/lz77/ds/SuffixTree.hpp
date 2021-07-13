@@ -59,6 +59,7 @@ namespace tdc::lz77 {
         }
 
         Node <T> * updateSplittedNode(Node <T> *w, Node <T> *y) const {
+            w->parent = y;
             w->edgeLabel = &buffer[suffixArray[currentIteration - 1] + lcpArray[currentIteration]];
             w->edgeLabelLength = (suffixArray[currentIteration - 1] + y->depth) -
                                  (suffixArray[currentIteration - 1] + lcpArray[currentIteration] - 1);

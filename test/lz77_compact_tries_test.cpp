@@ -34,7 +34,8 @@ TEST(wSuffixTree, wSuffixTree) {
     int lcp[dsSize] = {0,0,1,3,0,0,2};
     int * pSa = &sa[0];
     int * pLcp = &lcp[0];
-    lz77::SuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
+    lz77::WeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
+    std::cout << "OK";
 }
 
 TEST(lz77, LZ77CompactTries) {

@@ -23,10 +23,18 @@ namespace tdc {
     };
 
     template<typename T> requires std::integral<T>
-    struct WeightedNode : public Node<T> {
-        T min;
-        T max;
+    struct WeightedNode {
+        WeightedNode *parent;
+        const char *edgeLabel = nullptr; // (parent, this)
+        T edgeLabelLength = 1;
+        T nodeLabel = 0;
+        uint depth = 0;
 
-        explicit WeightedNode(WeightedNode *parent) : Node<T>(parent, nullptr, 1, 0, 0), min(0), max(0) {}
+        WeightedNode *rightmost = nullptr;
+        std::unordered_map<char, WeightedNode *> childNodes;
+        T minLabel = std::numeric_limits<T>::max();
+        T maxLabel = 0;
+
+        explicit WeightedNode(WeightedNode *parent) : parent(parent) {}
     };
 }
