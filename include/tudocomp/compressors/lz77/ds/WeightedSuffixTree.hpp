@@ -12,7 +12,7 @@ namespace tdc::lz77 {
         int *suffixArray;
         const char *buffer;
         int size;
-        Node<T> *root;
+        WeightedNode<T> *root;
         int currentIteration = 0;
     public:
         WeightedSuffixTree(int *lcpArray, int *suffixArray, const char *buffer, const int size) : lcpArray(lcpArray),
@@ -20,11 +20,11 @@ namespace tdc::lz77 {
                                                                                                           suffixArray),
                                                                                                   buffer(buffer),
                                                                                                   size(size) {
-            root = new Node<T>(nullptr);
+            root = new WeightedNode<T>(nullptr);
             root->rightmost = root;
 
             for (; this->currentIteration < size; this->currentIteration++) {
-                Node<T> *deepestNode = root->rightmost;
+                WeightedNode<T> *deepestNode = root->rightmost;
 
                 while (!isDeepestNode(deepestNode)) {
                     deepestNode = deepestNode->parent;
@@ -38,22 +38,22 @@ namespace tdc::lz77 {
             }
         }
 
-        Node<T> *splitNode(Node<T> *deepestNode) const {
-            Node<T> *v = deepestNode;
-            Node<T> *w = deepestNode->rightmost;
+        WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) const {
+            WeightedNode<T> *v = deepestNode;
+            WeightedNode<T> *w = deepestNode->rightmost;
 
             // 1. Delete (v,w)
             v->childNodes.erase(w->edgeLabel[0]);
 
             // 2. Add a new node y and a new edge (v, y)
-            Node<T> *y = getSplitMiddleNode(v);
+            WeightedNode<T> *y = getSplitMiddleNode(v);
 
             // 3. Add (y, w)
             updateSplittedNode(w, y);
             return y;
         }
 
-        Node<T> *updateSplittedNode(Node<T> *w, Node<T> *y) const {
+        WeightedNode<T> *updateSplittedNode(WeightedNode<T> *w, WeightedNode<T> *y) const {
             w->edgeLabel = &buffer[suffixArray[currentIteration - 1] + lcpArray[currentIteration]];
             w->edgeLabelLength = (suffixArray[currentIteration - 1] + y->depth) -
                                  (suffixArray[currentIteration - 1] + lcpArray[currentIteration] - 1);
@@ -62,8 +62,8 @@ namespace tdc::lz77 {
             return w;
         }
 
-        Node<T> *getSplitMiddleNode(Node<T> *v) const {
-            auto *y = new Node<T>(v);
+        WeightedNode<T> *getSplitMiddleNode(WeightedNode<T> *v) const {
+            auto *y = new WeightedNode<T>(v);
             y->edgeLabel = &buffer[suffixArray[currentIteration - 1] + v->depth];
             y->edgeLabelLength = (suffixArray[currentIteration - 1] + lcpArray[currentIteration]) -
                                  (suffixArray[currentIteration - 1] + v->depth);
@@ -76,7 +76,7 @@ namespace tdc::lz77 {
             delete root;
         }
 
-        void addLeaf(Node<T> *parent) {
+        void addLeaf(WeightedNode<T> *parent) {
             parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]] = new Node(
                     parent);
             // latest child equals right-most
@@ -85,18 +85,18 @@ namespace tdc::lz77 {
             setLabelsForLeaf(root->rightmost);
         }
 
-        void setLabelsForLeaf(Node<T> *leaf) {
+        void setLabelsForLeaf(WeightedNode<T> *leaf) {
             leaf->nodeLabel = suffixArray[currentIteration];
             leaf->edgeLabel = &buffer[suffixArray[currentIteration] + lcpArray[currentIteration]];
             leaf->edgeLabelLength = size - (suffixArray[currentIteration] + lcpArray[currentIteration]);
             leaf->depth = leaf->parent->depth + leaf->edgeLabelLength;
         }
 
-        bool isDeepestNode(Node<T> *node) {
+        bool isDeepestNode(WeightedNode<T> *node) {
             return node->depth <= lcpArray[currentIteration];
         }
 
-        bool requiresSplit(Node<T> *node) {
+        bool requiresSplit(WeightedNode<T> *node) {
             return node->depth < lcpArray[currentIteration];
         }
     };

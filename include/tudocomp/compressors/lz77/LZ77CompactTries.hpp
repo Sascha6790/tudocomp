@@ -104,6 +104,7 @@ namespace tdc::lz77 {
                     // take last edge e of stA and stB
                     // stB : max(e) = start of longest matched string
                     // stB: min(e) = start of longest matched string
+                    // add one of them as factor
                     debug();
                 }
                 std::cout << "Number of read chars: " << stream.gcount() << std::endl;
