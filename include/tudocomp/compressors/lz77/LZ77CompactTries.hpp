@@ -18,15 +18,15 @@
 #include <tudocomp/compressors/esp/MonotoneSubsequences.hpp>
 #include <divsufsort.h>
 #include "tudocomp/compressors/lz77/LZ77Helper.hpp"
-#include "tudocomp/compressors/lz77/ds/WeightedSuffixTree.hpp"
+#include "tudocomp/compressors/lz77/ds/CappedWeightedSuffixTree.hpp"
 
 namespace tdc::lz77 {
     template<typename lzss_coder_t>
     class LZ77CompactTries : public Compressor {
 
     private:
-        const size_t minFactorLength{};
-        const size_t windowSize{};
+        const size_t minFactorLength;
+        const size_t windowSize;
         lzss::FactorBufferRAM factors;
         int *suffixArray;
         int *inverseSuffixArray;
@@ -65,10 +65,6 @@ namespace tdc::lz77 {
             lcpArray = new int[dsSize];
         }
 
-        WeightedSuffixTree<unsigned int> *constructSuffixTree(char *buffer) {
-            return new WeightedSuffixTree<unsigned int>(lcpArray, suffixArray, buffer, dsSize);
-        }
-
         inline void compress(Input &input, Output &output) override {
             StatPhase root("Root");
             // initialize encoder
@@ -93,8 +89,35 @@ namespace tdc::lz77 {
                     constructSuffixArray(buffer);
                     constructInverseSuffixArray();
                     constructLcpArray(buffer);
-                    WeightedSuffixTree<unsigned int> * stA = constructSuffixTree(buffer); // BLock A
-                    WeightedSuffixTree<unsigned int> * stB = constructSuffixTree(&buffer[dsSize]); // Block B
+                    auto *stA = new CappedWeightedSuffixTree<unsigned int>(lcpArray, suffixArray, buffer, dsSize, windowSize);// BLock A
+                    auto *stB = new CappedWeightedSuffixTree<unsigned int>(lcpArray, suffixArray, &buffer[dsSize], dsSize, windowSize); // Block B
+
+                    int t;
+                    WeightedNode<unsigned int> *w1 = stA->getRoot();
+                    WeightedNode<unsigned int> *child = nullptr;
+                    for (t = windowSize; t < dsSize; t++) {
+                        auto node = w1->childNodes.find(buffer[t]);
+                        if(node == w1->childNodes.end()) {
+                            std::cout << "child";
+                            //
+                        } else {
+                            child = node->second;
+                            int max = child->maxLabel;
+                            int w = t - windowSize;
+                            if(child->maxLabel >= t - windowSize) {
+                                std::cout << "in window";
+                            }
+                            // return node->second;
+                        }
+
+
+                    }
+
+                    WeightedNode<unsigned int> *w2  = stB->getRoot();
+                    for (t = windowSize; t < dsSize; t++) {
+
+                    }
+
                     // traverse Top-Down stA and stB
                     // stA: compare to max(e)
                     //      if max(e) > i - w ? continue : stop
