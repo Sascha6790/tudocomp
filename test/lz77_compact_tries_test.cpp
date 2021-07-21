@@ -106,13 +106,13 @@ TEST(wSuffixTree, cbabcabcabcabca_duration) {
     int *pLcp = &lcp[0];
 
     auto start = std::chrono::system_clock::now();
-    for(int i = 0; i < 1; i++) {
+    for(int i = 0; i < 100000; i++) {
         const std::string buffer = "cbabcabcabcabca";
         lz77::WeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
     }
     auto end = std::chrono::system_clock::now();
     auto elapsed = end - start;
-    std::cout << elapsed.count() / 1000000 << '\n';
+    std::cout << elapsed.count() / 100000 << '\n';
 }
 
 TEST(wSuffixTree, cbabcabcabcabca) {

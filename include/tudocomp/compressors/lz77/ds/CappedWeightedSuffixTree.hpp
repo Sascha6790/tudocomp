@@ -14,23 +14,24 @@ namespace tdc::lz77 {
         int *suffixArray;
         const char *buffer;
         int size;
-        const int fixedLength;
+        const int window;
         WeightedNode<T> *root;
         int currentIteration = 0;
+        WeightedNode<T> *rightmostLeaf;
     public:
         CappedWeightedSuffixTree(int *lcpArray,
                                  int *suffixArray,
                                  const char *buffer,
                                  const int size,
-                                 const int fixedLength) : lcpArray(lcpArray),
-                                                          suffixArray(suffixArray),
-                                                          buffer(buffer),
-                                                          size(size),
-                                                          fixedLength(fixedLength) {
+                                 const int window) : lcpArray(lcpArray),
+                                                     suffixArray(suffixArray),
+                                                     buffer(buffer),
+                                                     size(size),
+                                                     window(window) {
             guard();
             initRootNode();
             for (; currentIteration < size; currentIteration++) {
-                if (isSuffixWithinBounds()) {
+                if (!isSuffixWithinBounds()) {
                     postProcessLcpArray(); // Post-Process LCP Array
                     continue;
                 }
@@ -50,11 +51,13 @@ namespace tdc::lz77 {
 
         void initRootNode() {
             root = new WeightedNode<T>(nullptr);
+            rightmostLeaf = root;
+            root->edgeLabelLength = 0;
             root->rightmost = root;
         }
 
         void guard() const {
-            if (fixedLength * 2 - 1 > size) {
+            if (window * 2 - 1 > size) {
                 throw std::invalid_argument("fixedLength * 2 - 1 > size");
             }
         }
@@ -66,11 +69,12 @@ namespace tdc::lz77 {
          * SA[i+1] has no common prefix with SA[i]
          */
         void postProcessLcpArray() {
-            lcpArray[currentIteration + 1] = 0;
+            lcpArray[currentIteration + 1] = std::min(lcpArray[currentIteration] , lcpArray[currentIteration + 1]);
+            suffixArray[currentIteration] = currentIteration == 0 ? 0 : lcpArray[currentIteration - 1];
         }
 
         bool isSuffixWithinBounds() const {
-            return suffixArray[currentIteration] + fixedLength > size;
+            return suffixArray[currentIteration] < window;
         }
 
         WeightedNode<T> *getRoot() const {
@@ -80,63 +84,82 @@ namespace tdc::lz77 {
         WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) {
             WeightedNode<T> *v = deepestNode;
             WeightedNode<T> *w = deepestNode->rightmost;
+            if (!w) {
+                return v;
+            }
 
             // 1. Delete (v,w)
             v->childNodes.erase(w->edgeLabel[0]);
+            w->parent = nullptr;
 
             // 2. Add a new node y and a new edge (v, y)
-            WeightedNode<T> *y = getSplitMiddleNode(v);
-
-            // 3. Add (y, w)
-            updateSplittedNode(w, y);
-            return y;
-        }
-
-        WeightedNode<T> *updateSplittedNode(WeightedNode<T> *w, WeightedNode<T> *y) {
-            w->parent = y;
-            w->edgeLabel = &buffer[suffixArray[currentIteration - 1] + lcpArray[currentIteration]];
-            w->edgeLabelLength = (suffixArray[currentIteration - 1] + y->depth) -
-                                 (suffixArray[currentIteration - 1] + lcpArray[currentIteration] - 1);
-            w->depth = y->depth + w->edgeLabelLength;
-            y->childNodes[w->edgeLabel[0]] = w;
-            updateMinMaxBottomUp(w->parent, w->nodeLabel);
-            return w;
-        }
-
-        WeightedNode<T> *getSplitMiddleNode(WeightedNode<T> *v) {
             auto *y = new WeightedNode<T>(v);
-            y->edgeLabel = &buffer[suffixArray[currentIteration - 1] + v->depth];
-            y->edgeLabelLength = (suffixArray[currentIteration - 1] + lcpArray[currentIteration]) -
-                                 (suffixArray[currentIteration - 1] + v->depth);
+            uint startOfString = suffixArray[currentIteration - 1] + v->depth;
+            uint endOfString = suffixArray[currentIteration - 1] + lcpArray[currentIteration] - 1;
+            y->edgeLabel = &buffer[startOfString];
+            y->edgeLabelLength = endOfString - startOfString + 1;
             y->depth = v->depth + y->edgeLabelLength;
             v->childNodes[y->edgeLabel[0]] = y;
+
+            // 3. Add (y,w)
+            startOfString = suffixArray[currentIteration - 1] + lcpArray[currentIteration];
+
+            endOfString = suffixArray[currentIteration - 1] + w->depth - 1;
+
+            this->rightmostLeaf = w;
+            y->rightmost = w;
+            w->parent = y;
+
+            // leaf->depth = splitNode->depth + splitNode->edgeLabelLength;
+            w->edgeLabel = &buffer[startOfString];
+            w->edgeLabelLength = endOfString - startOfString + 1;
+
+
+            y->childNodes[buffer[startOfString]] = w;
+            setDepth(w);
+            updateMinMaxBottomUp(w, w->nodeLabel);
+
             return y;
         }
 
         virtual ~CappedWeightedSuffixTree() {
+            destructPointers(root); // (valgrind) using pointers in maps require manually destruction of each pointer.
             delete root;
         }
 
-        void addLeaf(WeightedNode<T> *parent) {
-            if (fixedLength - parent->depth < 1) {
-                return;
+        void destructPointers(WeightedNode<T> *parent) {
+            auto itr = parent->childNodes.begin();
+            while (itr != parent->childNodes.end()) {
+                destructPointers(itr->second);
+                delete (itr->second);
+                itr = parent->childNodes.erase(itr);
             }
-            parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]] = new WeightedNode(
-                    parent);
-            // latest child equals right-most
-            root->rightmost = parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]];
-            parent->rightmost = root->rightmost;
-            setLabelsForLeaf(root->rightmost);
-            updateMinMaxBottomUp(root->rightmost, root->rightmost->nodeLabel);
         }
 
-        void setLabelsForLeaf(WeightedNode<T> *leaf) {
-            int maxLabelLengthAllowed = fixedLength - leaf->parent->depth;
+        void addLeaf(WeightedNode<T> *parent) {
+            if (window - parent->depth < 1) {
+                updateMinMaxBottomUp(parent, suffixArray[currentIteration]);
+                return;
+            }
+            int startOfString = suffixArray[currentIteration] + lcpArray[currentIteration];
+            int endOfString = size;
+
+
+            // latest child equals right-most
+            parent->childNodes[buffer[startOfString]] = new WeightedNode(parent);
+            auto leaf = parent->childNodes[buffer[startOfString]];
+            uint maxLabelLengthAllowed = window - leaf->parent->depth;
+            parent->rightmost = leaf;
+            this->rightmostLeaf = leaf;
+            leaf->parent = parent;
+
+            leaf->edgeLabel = &buffer[startOfString];
+            leaf->edgeLabelLength = endOfString - startOfString;
+            leaf->edgeLabelLength = std::min(maxLabelLengthAllowed, leaf->edgeLabelLength); // cap
             leaf->nodeLabel = suffixArray[currentIteration];
-            leaf->edgeLabel = &buffer[suffixArray[currentIteration] + lcpArray[currentIteration]];
-            leaf->edgeLabelLength = std::min(maxLabelLengthAllowed,
-                                             size - (suffixArray[currentIteration] + lcpArray[currentIteration]));
-            leaf->depth = leaf->parent->depth + leaf->edgeLabelLength;
+
+            setDepth(leaf);
+            updateMinMaxBottomUp(leaf, leaf->nodeLabel);
         }
 
         void updateMinMaxBottomUp(WeightedNode<T> *node, T label) {
@@ -152,11 +175,15 @@ namespace tdc::lz77 {
         }
 
         bool isDeepestNode(WeightedNode<T> *node) {
-            return node->depth <= std::min(lcpArray[currentIteration], fixedLength);
+            return node->depth <= std::min(lcpArray[currentIteration], window);
+        }
+
+        void setDepth(WeightedNode<T> *leaf) {
+            leaf->depth = leaf->parent->depth + leaf->edgeLabelLength;
         }
 
         bool requiresSplit(WeightedNode<T> *node) {
-            return node->parent != nullptr && node->depth < lcpArray[currentIteration];
+            return node->depth < lcpArray[currentIteration];
         }
     };
 }

@@ -16,19 +16,14 @@ namespace tdc::lz77 {
         int currentIteration = 0;
         WeightedNode <T> *rightmostLeaf;
     public:
-        WeightedSuffixTree(int *lcpArray, int *suffixArray, const char *buffer, const int size) : lcpArray(lcpArray),
-                                                                                                  suffixArray(
-                                                                                                          suffixArray),
-                                                                                                  buffer(buffer),
-                                                                                                  size(size) {
-            root = new WeightedNode<T>(nullptr);
-            this->rightmostLeaf = root;
-            root->edgeLabelLength = 0;
-
-            //add first node to be able to check for lcp[i-1] (i >= 1)
-            addLeaf(root);
-            this->currentIteration++;
-
+        WeightedSuffixTree(int *lcpArray,
+                           int *suffixArray,
+                           const char *buffer,
+                           const int size) : lcpArray(lcpArray),
+                                             suffixArray(suffixArray),
+                                             buffer(buffer),
+                                             size(size) {
+            initRootNode();
             for (; this->currentIteration < size; this->currentIteration++) {
                 WeightedNode<T> *deepestNode = this->rightmostLeaf;
 
@@ -41,9 +36,13 @@ namespace tdc::lz77 {
                 }
 
                 addLeaf(deepestNode);
-
-                return;
             }
+        }
+
+        void initRootNode() {
+            root = new WeightedNode<T>(nullptr);
+            rightmostLeaf = root;
+            root->edgeLabelLength = 0;
         }
 
         WeightedNode <T> *getRoot() const {
@@ -100,7 +99,7 @@ namespace tdc::lz77 {
             auto itr = parent->childNodes.begin();
             while (itr != parent->childNodes.end()) {
                 destructPointers(itr->second);
-                delete(itr->second);
+                delete (itr->second);
                 itr = parent->childNodes.erase(itr);
             }
         }
