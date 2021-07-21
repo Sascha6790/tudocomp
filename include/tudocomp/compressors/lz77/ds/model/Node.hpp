@@ -35,6 +35,6 @@ namespace tdc {
         T minLabel = std::numeric_limits<T>::max();
         T maxLabel = 0;
 
-        explicit WeightedNode(WeightedNode *parent) : parent(parent) {}
+        explicit    WeightedNode(WeightedNode *parent) : parent(parent) {}
     };
 }

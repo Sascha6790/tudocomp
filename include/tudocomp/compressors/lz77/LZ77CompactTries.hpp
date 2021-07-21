@@ -89,34 +89,21 @@ namespace tdc::lz77 {
                     constructSuffixArray(buffer);
                     constructInverseSuffixArray();
                     constructLcpArray(buffer);
-                    auto *stA = new CappedWeightedSuffixTree<unsigned int>(lcpArray, suffixArray, buffer, dsSize, windowSize);// BLock A
-                    auto *stB = new CappedWeightedSuffixTree<unsigned int>(lcpArray, suffixArray, &buffer[dsSize], dsSize, windowSize); // Block B
+                    auto *stA = new CappedWeightedSuffixTree<unsigned int>(lcpArray, suffixArray, buffer, dsSize,
+                                                                           windowSize);// BLock A
 
-                    int t;
-                    WeightedNode<unsigned int> *w1 = stA->getRoot();
-                    WeightedNode<unsigned int> *child = nullptr;
-                    for (t = windowSize; t < dsSize; t++) {
-                        auto node = w1->childNodes.find(buffer[t]);
-                        if(node == w1->childNodes.end()) {
-                            std::cout << "child";
-                            //
-                        } else {
-                            child = node->second;
-                            int max = child->maxLabel;
-                            int w = t - windowSize;
-                            if(child->maxLabel >= t - windowSize) {
-                                std::cout << "in window";
-                            }
-                            // return node->second;
-                        }
+                    unsigned int t;
+                    int maxE = getMaxE(stA, buffer, 0);
 
 
-                    }
+                    constructSuffixArray(buffer);
+                    constructInverseSuffixArray();
+                    constructLcpArray(buffer);
+                    // auto *stB = new CappedWeightedSuffixTree<unsigned int>(lcpArray, suffixArray, &buffer[windowSize],
+                    //                                                        dsSize, windowSize); // Block B
 
-                    WeightedNode<unsigned int> *w2  = stB->getRoot();
-                    for (t = windowSize; t < dsSize; t++) {
+                    // WeightedNode<unsigned int> *w2 = stB->getRoot();
 
-                    }
 
                     // traverse Top-Down stA and stB
                     // stA: compare to max(e)
@@ -136,6 +123,40 @@ namespace tdc::lz77 {
             std::cout << "Cleanup" << std::endl;
             delete[] buffer;
             delete[] suffixArray;
+        }
+
+        unsigned int getMaxE(const CappedWeightedSuffixTree<unsigned int> *stA,
+                             const char *buffer,
+                             const unsigned &offset) const {
+            unsigned int t;
+            unsigned int maxE = 0;
+            // std::shared_ptr<WeightedNode<uint>> w1 = stA->getRoot();
+            // std::shared_ptr<WeightedNode<uint>> child = nullptr;
+            //
+            // for (t = windowSize + offset; t < dsSize;) {
+            //     auto node = w1->childNodes.find(buffer[t]);
+            //     if (node == w1->childNodes.end()) {
+            //         // CASE: No children anymore BUT there could be a parent. print maxE which might have been filled by the parent.
+            //         std::cout << buffer[t] << " (" << t << ") not found, breaking" << std::endl;
+            //         return maxE;
+            //     } else {
+            //         // CASE: There are children. Check them.
+            //         child = node->second;
+            //         if (child->maxLabel >= t - windowSize) {
+            //             // CASE: Child within window, take it !
+            //             // might reach end of loop by `t += child->edgeLabelLength` return maxE at the end !
+            //             std::cout << "in window " << child->maxLabel << ">=" << t - windowSize << std::endl;
+            //             maxE = child->maxLabel;
+            //             t += child->edgeLabelLength;
+            //         } else {
+            //             // CASE: end of string is not within the window. End parsing here. Return latest maxE.
+            //             std::cout << "not in window " << child->maxLabel << "<" << t - windowSize << std::endl;
+            //             std::cout << "max_e: " << child->parent->maxLabel << std::endl;
+            //             return maxE;
+            //         }
+            //     }
+            // }
+            return maxE;
         }
 
         void constructInverseSuffixArray() {

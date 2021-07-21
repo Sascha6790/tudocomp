@@ -54,8 +54,8 @@ namespace tdc::lz77 {
         }
 
         void guard() const {
-            if (fixedLength * 2 > size) {
-                throw std::invalid_argument("fixedLength * 2 > size");
+            if (fixedLength * 2 - 1 > size) {
+                throw std::invalid_argument("fixedLength * 2 - 1 > size");
             }
         }
 
@@ -94,9 +94,9 @@ namespace tdc::lz77 {
 
         WeightedNode<T> *updateSplittedNode(WeightedNode<T> *w, WeightedNode<T> *y) {
             w->parent = y;
-            w->edgeLabel = &buffer[suffixArray[currentIteration - 1] + getLcpValue()];
+            w->edgeLabel = &buffer[suffixArray[currentIteration - 1] + lcpArray[currentIteration]];
             w->edgeLabelLength = (suffixArray[currentIteration - 1] + y->depth) -
-                                 (suffixArray[currentIteration - 1] + getLcpValue() - 1);
+                                 (suffixArray[currentIteration - 1] + lcpArray[currentIteration] - 1);
             w->depth = y->depth + w->edgeLabelLength;
             y->childNodes[w->edgeLabel[0]] = w;
             updateMinMaxBottomUp(w->parent, w->nodeLabel);
@@ -106,7 +106,7 @@ namespace tdc::lz77 {
         WeightedNode<T> *getSplitMiddleNode(WeightedNode<T> *v) {
             auto *y = new WeightedNode<T>(v);
             y->edgeLabel = &buffer[suffixArray[currentIteration - 1] + v->depth];
-            y->edgeLabelLength = (suffixArray[currentIteration - 1] + getLcpValue()) -
+            y->edgeLabelLength = (suffixArray[currentIteration - 1] + lcpArray[currentIteration]) -
                                  (suffixArray[currentIteration - 1] + v->depth);
             y->depth = v->depth + y->edgeLabelLength;
             v->childNodes[y->edgeLabel[0]] = y;
@@ -121,10 +121,10 @@ namespace tdc::lz77 {
             if (fixedLength - parent->depth < 1) {
                 return;
             }
-            parent->childNodes[buffer[suffixArray[currentIteration] + getLcpValue()]] = new WeightedNode(
+            parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]] = new WeightedNode(
                     parent);
             // latest child equals right-most
-            root->rightmost = parent->childNodes[buffer[suffixArray[currentIteration] + getLcpValue()]];
+            root->rightmost = parent->childNodes[buffer[suffixArray[currentIteration] + lcpArray[currentIteration]]];
             parent->rightmost = root->rightmost;
             setLabelsForLeaf(root->rightmost);
             updateMinMaxBottomUp(root->rightmost, root->rightmost->nodeLabel);
@@ -133,9 +133,9 @@ namespace tdc::lz77 {
         void setLabelsForLeaf(WeightedNode<T> *leaf) {
             int maxLabelLengthAllowed = fixedLength - leaf->parent->depth;
             leaf->nodeLabel = suffixArray[currentIteration];
-            leaf->edgeLabel = &buffer[suffixArray[currentIteration] + getLcpValue()];
+            leaf->edgeLabel = &buffer[suffixArray[currentIteration] + lcpArray[currentIteration]];
             leaf->edgeLabelLength = std::min(maxLabelLengthAllowed,
-                                             size - (suffixArray[currentIteration] + getLcpValue()));
+                                             size - (suffixArray[currentIteration] + lcpArray[currentIteration]));
             leaf->depth = leaf->parent->depth + leaf->edgeLabelLength;
         }
 
@@ -152,15 +152,11 @@ namespace tdc::lz77 {
         }
 
         bool isDeepestNode(WeightedNode<T> *node) {
-            return node->depth <= getLcpValue();
-        }
-
-        int getLcpValue() {
-            return std::min(lcpArray[currentIteration], fixedLength);
+            return node->depth <= std::min(lcpArray[currentIteration], fixedLength);
         }
 
         bool requiresSplit(WeightedNode<T> *node) {
-            return node->depth < getLcpValue();
+            return node->parent != nullptr && node->depth < lcpArray[currentIteration];
         }
     };
 }
