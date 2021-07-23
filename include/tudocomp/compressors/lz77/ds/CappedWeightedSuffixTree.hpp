@@ -35,7 +35,7 @@ namespace tdc::lz77 {
                     postProcessLcpArray(); // Post-Process LCP Array
                     continue;
                 }
-                WeightedNode<T> *deepestNode = root->rightmost;
+                WeightedNode<T> *deepestNode = this->rightmostLeaf;
 
                 while (!isDeepestNode(deepestNode)) {
                     deepestNode = deepestNode->parent;
@@ -85,6 +85,7 @@ namespace tdc::lz77 {
             WeightedNode<T> *v = deepestNode;
             WeightedNode<T> *w = deepestNode->rightmost;
             if (!w) {
+                // updateMinMaxBottomUp(deepestNode, suffixArray[currentIteration]);
                 return v;
             }
 
