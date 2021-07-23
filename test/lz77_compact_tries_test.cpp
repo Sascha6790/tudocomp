@@ -26,19 +26,27 @@ TEST(suffixTree, suffixTree) {
     int *pSa = &sa[0];
     int *pLcp = &lcp[0];
     lz77::SuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
+
+    WeightedNode<uint> *node0 = st.getRoot()->childNodes['b'];
+
+    WeightedNode<uint> *node4a = st.getRoot()->childNodes['n'];
+    WeightedNode<uint> *node4 = node4a->childNodes['$'];
+    WeightedNode<uint> *node2 = node4->childNodes['n'];
+
+    WeightedNode<uint> *node5a = st.getRoot()->childNodes['a'];
+    WeightedNode<uint> *node5 = node5a->childNodes['$'];
+    WeightedNode<uint> *node3a = node5->childNodes['n'];
+    WeightedNode<uint> *node3 = node3a->childNodes['$'];
+    WeightedNode<uint> *node1 = node3a->childNodes['n'];
+
+    ASSERT_EQ(node0->nodeLabel, 0);
+    ASSERT_EQ(node4->nodeLabel, 4);
+    ASSERT_EQ(node2->nodeLabel, 2);
+    ASSERT_EQ(node5->nodeLabel, 5);
+    ASSERT_EQ(node3->nodeLabel, 3);
+    ASSERT_EQ(node1->nodeLabel, 1);
 }
 
-TEST(wSuffixTree, uncapped) {
-    const std::string buffer = "banana$";
-    // zero-based
-    const int dsSize = 7;
-    int sa[dsSize] = {6, 5, 3, 1, 0, 4, 2};
-    int lcp[dsSize] = {0, 0, 1, 3, 0, 0, 2};
-    int *pSa = &sa[0];
-    int *pLcp = &lcp[0];
-    lz77::WeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
-    std::cout << "OK";
-}
 
 TEST(wSuffixTree, FIXED_SIZE_TOO_BIG) {
     // FIXED_SIZE * 2 > DS_SIZE
@@ -60,44 +68,7 @@ TEST(wSuffixTree, FIXED_SIZE_TOO_BIG) {
     }
 }
 
-TEST(wSuffixTree, capped_banana$) {
-    const std::string buffer = "banana$";
-    // zero-based
-    const int dsSize = 7;
-    int sa[dsSize] = {6, 5, 3, 1, 0, 4, 2};
-    int lcp[dsSize] = {0, 0, 1, 3, 0, 0, 2};
-    int *pSa = &sa[0];
-    int *pLcp = &lcp[0];
-    lz77::CappedWeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize, 3);
-    std::cout << "O";
-}
-
-TEST(wSuffixTree, capped_aanana$) {
-    const std::string buffer = "aanana$";
-    // zero-based
-    const int dsSize = 7;
-    int sa[dsSize] = {6, 5, 0, 3, 1, 4, 2};
-    int lcp[dsSize] = {0, 0, 0, 1, 3, 0, 2};
-    int *pSa = &sa[0];
-    int *pLcp = &lcp[0];
-    lz77::CappedWeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize, 3);
-    std::cout << "O";
-}
-
-TEST(wSuffixTree, LCP_VALUE_EXCEEDS_FIXED_SIZE) {
-    // LCP[4] = 5 > FIXED_SIZE = 4
-    const std::string buffer = "bananana$";
-    // zero-based
-    const int dsSize = 9;
-    int sa[dsSize] = {8, 7, 5, 3, 1, 0, 6, 4, 2};
-    int lcp[dsSize] = {0, 0, 1, 3, 5, 0, 0, 2, 4};
-    int *pSa = &sa[0];
-    int *pLcp = &lcp[0];
-    lz77::CappedWeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize, 4);
-    std::cout << "O";
-}
-
-TEST(wSuffixTree, cbabcabcabcabca_duration) {
+TEST(time, cbabcabcabcabca_duration) {
     // zero-based
     const int dsSize = 15;
     int sa[dsSize] = {14, 11, 8, 5, 2, 1, 12, 9, 6, 3, 13, 10, 7, 4, 0};
@@ -106,7 +77,7 @@ TEST(wSuffixTree, cbabcabcabcabca_duration) {
     int *pLcp = &lcp[0];
 
     auto start = std::chrono::system_clock::now();
-    for(int i = 0; i < 100000; i++) {
+    for (int i = 0; i < 100000; i++) {
         const std::string buffer = "cbabcabcabcabca";
         lz77::WeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
     }
@@ -115,7 +86,7 @@ TEST(wSuffixTree, cbabcabcabcabca_duration) {
     std::cout << elapsed.count() / 100000 << '\n';
 }
 
-TEST(wSuffixTree, cbabcabcabcabca) {
+TEST(WeightedSuffixTree, cbabcabcabcabca) {
     const std::string buffer = "cbabcabcabcabca";
     // zero-based
     const int dsSize = 15;
@@ -201,7 +172,7 @@ TEST(wSuffixTree, cbabcabcabcabca) {
     ASSERT_EQ(node14->maxLabel, 14);
 }
 
-TEST(wSuffixTree, DIFFERENT_MIN_MAX_VALUES_IN_LEAF) {
+TEST(WSlidingTree, DIFFERENT_MIN_MAX_VALUES_IN_LEAF) {
     // LCP[4] = 5 > FIXED_SIZE = 4
     const std::string buffer = "cbabcabcabcabca";
     // zero-based
@@ -211,19 +182,41 @@ TEST(wSuffixTree, DIFFERENT_MIN_MAX_VALUES_IN_LEAF) {
     int *pSa = &sa[0];
     int *pLcp = &lcp[0];
     lz77::CappedWeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize, 8);
-    std::cout << "O";
-}
 
-TEST(suffixTree, bananana$) {
-    const std::string buffer = "bananana$";
-    // zero-based
-    const int dsSize = 9;
-    int sa[dsSize] = {8, 7, 5, 3, 1, 0, 6, 4, 2};
-    int lcp[dsSize] = {0, 0, 1, 3, 5, 0, 0, 2, 4};
-    int *pSa = &sa[0];
-    int *pLcp = &lcp[0];
-    lz77::SuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
-    std::cout << "O";
+    WeightedNode<uint> *node5 = st.getRoot()->childNodes['a'];
+
+    WeightedNode<uint> *node1a = st.getRoot()->childNodes['b'];
+    WeightedNode<uint> *node1b = node1a->childNodes['a'];
+    WeightedNode<uint> *node6 = node1a->childNodes['c'];
+
+    WeightedNode<uint> *node7a = st.getRoot()->childNodes['c'];
+    WeightedNode<uint> *node7b = node7a->childNodes['a'];
+    WeightedNode<uint> *node0 = node7a->childNodes['b'];
+
+    // Test label
+    ASSERT_EQ(node5->nodeLabel, 5);
+    ASSERT_EQ(node1b->nodeLabel, 1);
+    ASSERT_EQ(node6->nodeLabel, 6);
+    ASSERT_EQ(node7b->nodeLabel, 7);
+    ASSERT_EQ(node0->nodeLabel, 0);
+
+    // Test min
+    ASSERT_EQ(node5->minLabel, 2);
+    ASSERT_EQ(node1a->minLabel, 1);
+    ASSERT_EQ(node1b->minLabel, 1);
+    ASSERT_EQ(node6->minLabel, 3);
+    ASSERT_EQ(node7a->minLabel, 0);
+    ASSERT_EQ(node7b->minLabel, 4);
+    ASSERT_EQ(node0->minLabel, 0);
+
+    // Test max
+    ASSERT_EQ(node5->maxLabel, 5);
+    ASSERT_EQ(node1a->maxLabel, 6);
+    ASSERT_EQ(node1b->maxLabel, 1);
+    ASSERT_EQ(node6->maxLabel, 6);
+    ASSERT_EQ(node7a->maxLabel, 7);
+    ASSERT_EQ(node7b->maxLabel, 7);
+    ASSERT_EQ(node0->maxLabel, 0);
 }
 
 
