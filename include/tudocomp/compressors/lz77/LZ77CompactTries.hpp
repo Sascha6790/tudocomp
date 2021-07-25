@@ -100,11 +100,11 @@ namespace tdc::lz77 {
                     std::cout << "EOF" << std::endl;
                 } else {
                     constructSuffixArray(buffer, suffixArrayB1, dsSize);
-                    constructSuffixArray(buffer, suffixArrayB2, dsSize);
+                    constructSuffixArray(&buffer[windowSize], suffixArrayB2, dsSize);
                     constructInverseSuffixArray(suffixArrayB1, inverseSuffixArrayB1, dsSize);
                     constructInverseSuffixArray(suffixArrayB2, inverseSuffixArrayB2, dsSize);
                     constructLcpArray(buffer, suffixArrayB1, inverseSuffixArrayB1, lcpArrayB1, dsSize);
-                    constructLcpArray(buffer, suffixArrayB2, inverseSuffixArrayB2, lcpArrayB2, dsSize);
+                    constructLcpArray(&buffer[windowSize], suffixArrayB2, inverseSuffixArrayB2, lcpArrayB2, dsSize);
 
                     // TODO reuse stB and swap with stA
                     auto *stA = new CappedWeightedSuffixTree<unsigned int>(lcpArrayB1,
@@ -123,9 +123,10 @@ namespace tdc::lz77 {
                     for (offset = 0; offset < windowSize; offset++) {
                         // just for debugging, remove later.
                         const char *matchMe = &buffer[windowSize + offset];
-                        int maxE = getEdge(stA, buffer, offset, matchedCharsMaxEdge, &maxEdgeComparator);
-                        int minE = getEdge(stB, buffer, offset, matchedCharsMinEdge, &minEdgeComparator);
-                        std::cout << "Factor?: (" << maxE << "," << matchedCharsMaxEdge << ")" << std::endl;
+                        int maxEBlock1 = getEdge(stA, buffer, offset, matchedCharsMaxEdge, &maxEdgeComparator);
+                        int maxEBlock2 = getEdge(stB, buffer, offset, matchedCharsMinEdge, &minEdgeComparator);
+                        std::cout << "Factor?: (" << maxEBlock1 << "," << matchedCharsMaxEdge << ")" << std::endl;
+                        std::cout << "Factor?: (" << maxEBlock2 << "," << matchedCharsMaxEdge << ")" << std::endl;
                     }
                     debug();
                 }
