@@ -137,6 +137,7 @@ namespace tdc::lz77 {
             endOfString = suffixArray[currentIteration - 1] + w->depth - 1;
 
             this->rightmostLeaf = w;
+            v->rightmost = y;
             y->rightmost = w;
             w->parent = y;
 
