@@ -95,7 +95,7 @@ TEST(WeightedSuffixTree, cbabcabcabcabca) {
     int *pSa = &sa[0];
     int *pLcp = &lcp[0];
     lz77::WeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
-    std::cout << "O";
+
     ASSERT_EQ(st.getRoot()->childNodes.size(), 3);
 
     WeightedNode<uint> *node14 = st.getRoot()->childNodes['a'];
@@ -177,11 +177,16 @@ TEST(WSlidingTree, DIFFERENT_MIN_MAX_VALUES_IN_LEAF) {
     const std::string buffer = "cbabcabcabcabca";
     // zero-based
     const int dsSize = 15;
-    int sa[dsSize] = {14, 11, 8, 5, 2, 1, 12, 9, 6, 3, 13, 10, 7, 4, 0};
-    int lcp[dsSize] = {0, 1, 4, 7, 10, 0, 1, 3, 6, 9, 0, 2, 5, 8, 1};
+    int sa[dsSize] = {};
+    int isa[dsSize] = {};
+    int lcp[dsSize] = {};
+    lz77::LZ77CompactTries<uint>::constructSuffixArray(buffer.c_str(), sa, dsSize);
+    lz77::LZ77CompactTries<uint>::constructInverseSuffixArray(sa, isa, dsSize);
+    lz77::LZ77CompactTries<uint>::constructLcpArray(buffer.c_str(), sa, isa, lcp, dsSize);
     int *pSa = &sa[0];
     int *pLcp = &lcp[0];
     lz77::CappedWeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize, 8);
+    st.print(st.getRoot());
 
     WeightedNode<uint> *node5 = st.getRoot()->childNodes['a'];
 
@@ -219,9 +224,27 @@ TEST(WSlidingTree, DIFFERENT_MIN_MAX_VALUES_IN_LEAF) {
     ASSERT_EQ(node0->maxLabel, 0);
 }
 
+TEST(WSlidingTree, abcabcabcbabcab) {
+    // LCP[4] = 5 > FIXED_SIZE = 4
+    const std::string buffer = "abcabcabcbabcab";
+    // zero-based
+    const int dsSize = 15;
+    int sa[dsSize] = {};
+    int isa[dsSize] = {};
+    int lcp[dsSize] = {};
+    lz77::LZ77CompactTries<uint>::constructSuffixArray(buffer.c_str(), sa, dsSize);
+    lz77::LZ77CompactTries<uint>::constructInverseSuffixArray(sa, isa, dsSize);
+    lz77::LZ77CompactTries<uint>::constructLcpArray(buffer.c_str(), sa, isa, lcp, dsSize);
+    int *pSa = &sa[0];
+    int *pLcp = &lcp[0];
+    lz77::CappedWeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize, 8);
+    // st.print(st.getRoot());
+    //WeightedNode<uint> *node5 = st.getRoot()->childNodes['a'];
+}
+
 
 TEST(lz77, LZ77CompactTries) {
-    const std::string input = "cbabcabcabcabca$$$$$$$$$$$$$$$$";
+    const std::string input = "cbabcabcabcabcabcbabcab$$";
     auto result = test::compress<lz77::LZ77CompactTries<lzss::DidacticalCoder>>(input, "window=8");
     std::cout << std::left << std::setw(22) << std::setfill(' ') << result.str;
     ASSERT_EQ(result.str, "");

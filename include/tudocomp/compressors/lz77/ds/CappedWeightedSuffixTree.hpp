@@ -19,6 +19,32 @@ namespace tdc::lz77 {
         int currentIteration = 0;
         WeightedNode<T> *rightmostLeaf;
     public:
+        void print(WeightedNode<T> *parent) {
+            for (int i = 0; i < parent->edgeLabelLength; i++) {
+                std::cout << parent->edgeLabel[i];
+            }
+            if (parent->edgeLabelLength) {
+                std::cout << "(" << parent->minLabel << "," << parent->maxLabel << ")";
+            }
+            auto itr = parent->childNodes.begin();
+            bool hasChildren = itr != parent->childNodes.end();
+            if (hasChildren) {
+                std::cout << "->Children(";
+            }
+            while (itr != parent->childNodes.end()) {
+                std::cout << "[";
+                print(itr->second);
+                std::cout << "]";
+                itr++;
+                if (itr != parent->childNodes.end()) {
+                    std::cout << ", ";
+                }
+            }
+            if (hasChildren) {
+                std::cout << ") ";
+            }
+        }
+
         CappedWeightedSuffixTree(int *lcpArray,
                                  int *suffixArray,
                                  const char *buffer,
@@ -69,8 +95,8 @@ namespace tdc::lz77 {
          * SA[i+1] has no common prefix with SA[i]
          */
         void postProcessLcpArray() {
-            lcpArray[currentIteration + 1] = std::min(lcpArray[currentIteration] , lcpArray[currentIteration + 1]);
-            suffixArray[currentIteration] = currentIteration == 0 ? 0 : lcpArray[currentIteration - 1];
+            lcpArray[currentIteration + 1] = std::min(lcpArray[currentIteration], lcpArray[currentIteration + 1]);
+            suffixArray[currentIteration] = currentIteration == 0 ? 0 : suffixArray[currentIteration - 1];
         }
 
         bool isSuffixWithinBounds() const {
@@ -82,6 +108,9 @@ namespace tdc::lz77 {
         }
 
         WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) {
+            if(currentIteration == 9) {
+                print(this->root);
+            }
             WeightedNode<T> *v = deepestNode;
             WeightedNode<T> *w = deepestNode->rightmost;
             if (!w) {
