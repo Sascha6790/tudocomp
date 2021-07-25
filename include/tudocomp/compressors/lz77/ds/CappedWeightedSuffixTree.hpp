@@ -136,6 +136,7 @@ namespace tdc::lz77 {
             this->rightmostLeaf = w;
             v->rightmost = y;
             y->rightmost = w;
+            y->nodeLabel = w->nodeLabel;
             w->parent = y;
 
             // leaf->depth = splitNode->depth + splitNode->edgeLabelLength;
