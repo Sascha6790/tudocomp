@@ -238,7 +238,7 @@ TEST(WSlidingTree, abcabcabcbabcab) {
     int *pSa = &sa[0];
     int *pLcp = &lcp[0];
     lz77::CappedWeightedSuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize, 8);
-    // st.print(st.getRoot());
+    st.print(st.getRoot());
     //WeightedNode<uint> *node5 = st.getRoot()->childNodes['a'];
 }
 

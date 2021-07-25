@@ -108,9 +108,6 @@ namespace tdc::lz77 {
         }
 
         WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) {
-            if(currentIteration == 9) {
-                print(this->root);
-            }
             WeightedNode<T> *v = deepestNode;
             WeightedNode<T> *w = deepestNode->rightmost;
             if (!w) {
