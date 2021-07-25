@@ -1,21 +1,28 @@
 [submodule "external/datasets"]
 	path = submodules/datasets
 	url = https://github.com/tudocomp/datasets.git
+	ignore = dirty
 [submodule "external/bit_span"]
 	path = submodules/bit_span
 	url = https://github.com/tudocomp/bit_span.git
+	ignore = dirty
 [submodule "external/compact_sparse_hash"]
 	path = submodules/compact_sparse_hash
 	url = https://github.com/tudocomp/compact_sparse_hash.git
+	ignore = dirty
 [submodule "external/tudostats"]
 	path = submodules/tudostats
 	url = https://github.com/tudocomp/tudostats
+	ignore = dirty
 [submodule "external/build_system"]
 	path = submodules/build_system
 	url = https://github.com/tudocomp/build_system
+	ignore = dirty
 [submodule "submodules/separate_chaining"]
 	path = submodules/separate_chaining
 	url = https://github.com/koeppl/separate_chaining
+	ignore = dirty
 [submodule "submodules/broadwordsearch"]
 	path = submodules/broadwordsearch
 	url = https://github.com/koeppl/broadwordsearch
+	ignore = dirty
