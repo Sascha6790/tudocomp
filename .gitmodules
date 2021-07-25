@@ -26,3 +26,5 @@
 	path = submodules/broadwordsearch
 	url = https://github.com/koeppl/broadwordsearch
 	ignore = dirty
+[submodule "submodules/build_system"]
+	ignore = untracked
