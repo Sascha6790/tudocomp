@@ -10,50 +10,27 @@ namespace tdc::lz77 {
 
     template<typename T> requires std::integral<T>
     class CappedWeightedSuffixTree {
-        int *lcpArray;
-        int *suffixArray;
-        const char *buffer;
-        int size;
+        int *lcpArray{};
+        int *suffixArray{};
+    private:
+
+        uint size;
         const int window;
         WeightedNode<T> *root;
         int currentIteration = 0;
         WeightedNode<T> *rightmostLeaf;
     public:
-        void print(WeightedNode<T> *parent) {
-            for (int i = 0; i < parent->edgeLabelLength; i++) {
-                std::cout << parent->edgeLabel[i];
-            }
-            if (parent->edgeLabelLength) {
-                std::cout << "(" << parent->minLabel << "," << parent->maxLabel << ")";
-            }
-            auto itr = parent->childNodes.begin();
-            bool hasChildren = itr != parent->childNodes.end();
-            if (hasChildren) {
-                std::cout << "->Children(";
-            }
-            while (itr != parent->childNodes.end()) {
-                std::cout << "[";
-                print(itr->second);
-                std::cout << "]";
-                itr++;
-                if (itr != parent->childNodes.end()) {
-                    std::cout << ", ";
-                }
-            }
-            if (hasChildren) {
-                std::cout << ") ";
-            }
-        }
-
+        const char *buffer;
         CappedWeightedSuffixTree(int *lcpArray,
                                  int *suffixArray,
                                  const char *buffer,
-                                 const int size,
-                                 const int window) : lcpArray(lcpArray),
-                                                     suffixArray(suffixArray),
-                                                     buffer(buffer),
-                                                     size(size),
-                                                     window(window) {
+                                 const uint size,
+                                 const uint window) : lcpArray(lcpArray),
+                                                      suffixArray(suffixArray),
+                                                      size(size),
+                                                      buffer(buffer),
+                                                      window(window) {
+
             guard();
             initRootNode();
             for (; currentIteration < size; currentIteration++) {
@@ -75,14 +52,16 @@ namespace tdc::lz77 {
             }
         }
 
-        void initRootNode() {
+        [[gnu::always_inline]]
+        inline void initRootNode() {
             root = new WeightedNode<T>(nullptr);
             rightmostLeaf = root;
             root->edgeLabelLength = 0;
             root->rightmost = root;
         }
 
-        void guard() const {
+        [[gnu::always_inline]]
+        inline void guard() const {
             if (window * 2 - 1 > size) {
                 throw std::invalid_argument("fixedLength * 2 - 1 > size");
             }
@@ -94,12 +73,15 @@ namespace tdc::lz77 {
          * because it's length doesn't suffice the given criteria and thus
          * SA[i+1] has no common prefix with SA[i]
          */
-        void postProcessLcpArray() {
-            lcpArray[currentIteration + 1] = std::min(lcpArray[currentIteration], lcpArray[currentIteration + 1]);
+        [[gnu::always_inline]]
+        inline void postProcessLcpArray() {
+            if(currentIteration + 1 < size) {
+                lcpArray[currentIteration + 1] = std::min(lcpArray[currentIteration], lcpArray[currentIteration + 1]);
+            }
             suffixArray[currentIteration] = currentIteration == 0 ? 0 : suffixArray[currentIteration - 1];
         }
 
-        bool isSuffixWithinBounds() const {
+        inline bool isSuffixWithinBounds() const {
             return suffixArray[currentIteration] < window;
         }
 
@@ -107,7 +89,8 @@ namespace tdc::lz77 {
             return root;
         }
 
-        WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) {
+        [[gnu::always_inline]][[gnu::hot]]
+        inline WeightedNode<T> *splitNode(WeightedNode<T> *deepestNode) {
             WeightedNode<T> *v = deepestNode;
             WeightedNode<T> *w = deepestNode->rightmost;
             if (!w) {
@@ -165,7 +148,8 @@ namespace tdc::lz77 {
             }
         }
 
-        void addLeaf(WeightedNode<T> *parent) {
+        [[gnu::always_inline]][[gnu::hot]]
+        inline void addLeaf(WeightedNode<T> *parent) {
             if (window - parent->depth < 1) {
                 updateMinMaxBottomUp(parent, suffixArray[currentIteration]);
                 return;
@@ -191,7 +175,10 @@ namespace tdc::lz77 {
             updateMinMaxBottomUp(leaf, leaf->nodeLabel);
         }
 
-        void updateMinMaxBottomUp(WeightedNode<T> *node, T label) {
+        // inline a recursion ? Outcome heavily depends on the compiler and probably gets ignored anyway.
+        // some (e.g. MSVC) have an optimized setting which limits the maximum depth.
+        // remark: tested -> inline improves performance on a small text. not tested on big texts.
+        inline void updateMinMaxBottomUp(WeightedNode<T> *node, T label) {
             if (label > node->maxLabel) {
                 node->maxLabel = label;
             }
@@ -199,20 +186,49 @@ namespace tdc::lz77 {
                 node->minLabel = label;
             }
             if (node->parent != nullptr) {
-                updateMinMaxBottomUp(node->parent, label); // O(\sigma)
+                updateMinMaxBottomUp(node->parent, label);
             }
         }
 
-        bool isDeepestNode(WeightedNode<T> *node) {
+        [[gnu::always_inline]]
+        inline bool isDeepestNode(WeightedNode<T> *node) {
             return node->depth <= std::min(lcpArray[currentIteration], window);
         }
 
-        void setDepth(WeightedNode<T> *leaf) {
+        [[gnu::always_inline]]
+        inline void setDepth(WeightedNode<T> *leaf) {
             leaf->depth = leaf->parent->depth + leaf->edgeLabelLength;
         }
 
-        bool requiresSplit(WeightedNode<T> *node) {
+        [[gnu::always_inline]]
+        inline bool requiresSplit(WeightedNode<T> *node) {
             return node->depth < lcpArray[currentIteration];
+        }
+
+        void print(WeightedNode<T> *parent) {
+            for (int i = 0; i < parent->edgeLabelLength; i++) {
+                std::cout << parent->edgeLabel[i];
+            }
+            if (parent->edgeLabelLength) {
+                std::cout << "(" << parent->minLabel << "," << parent->maxLabel << ")";
+            }
+            auto itr = parent->childNodes.begin();
+            bool hasChildren = itr != parent->childNodes.end();
+            if (hasChildren) {
+                std::cout << "->Children(";
+            }
+            while (itr != parent->childNodes.end()) {
+                std::cout << "[";
+                print(itr->second);
+                std::cout << "]";
+                itr++;
+                if (itr != parent->childNodes.end()) {
+                    std::cout << ", ";
+                }
+            }
+            if (hasChildren) {
+                std::cout << ") ";
+            }
         }
     };
 }

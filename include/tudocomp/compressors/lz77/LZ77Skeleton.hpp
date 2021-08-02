@@ -17,8 +17,7 @@
 #include <tudocomp/compressors/esp/MonotoneSubsequences.hpp>
 #include "LZ77Helper.hpp"
 
-namespace tdc {
-    namespace lz77 {
+namespace tdc::lz77 {
         template<typename lzss_coder_t>
         class LZ77Skeleton : public Compressor {
 
@@ -120,7 +119,7 @@ namespace tdc {
                         positionInText += factorLength;
                         LZ77Helper::moveSlidingWindowRight(stream, nextChar, ahead, window, factorLength);
                     }
-                    LZ77Helper::printStats(input, root, positionInText, factors);
+                    LZ77Helper::printStats(input, root, positionInText, factors, slidingWindowSize);
                 });
             }
 
@@ -129,5 +128,4 @@ namespace tdc {
             }
 
         };
-    }
-} //ns
+    } //ns

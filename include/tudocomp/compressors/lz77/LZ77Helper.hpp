@@ -24,32 +24,39 @@ namespace tdc {
     namespace lz77 {
        class LZ77Helper {
         public:
-            static void printStats(const Input &input, StatPhase &root, size_t positionInText, lzss::FactorBufferRAM factors) {
+            static void printStats(const Input &input, StatPhase &root, size_t positionInText, lzss::FactorBufferRAM factors, uint windowSize) {
                 json obj = root.to_json();
                 std::cout << obj;
                 row();
                 row();
                 row();
-
                 lzss::FactorizationStats stats(factors, positionInText);
                 stats.log();
 
-                col("Factors", 10);
-                col("Replaced", 10);
-                col("Unreplaced", 12);
-                col("memPeak", 10);
-                col("memFinal", 10);
-                col("timeDelta", 12);
-                col("Text[0..19]", 20);
-                col("Encoded", 22);
+                const int defaultWidth = 20;
+                col("WindowSize", defaultWidth);
+                col("Factors", defaultWidth);
+                col("Replaced", defaultWidth);
+                col("Unreplaced", defaultWidth);
+                col("Length avg", defaultWidth);
+                col("Length max", defaultWidth);
+                col("memOff", defaultWidth);
+                col("memPeak", defaultWidth);
+                col("memFinal", defaultWidth);
+                col("timeRun", defaultWidth);
                 row();
-                col(stats.num_factors, 10);
-                col(stats.num_replaced, 10);
-                col(stats.num_unreplaced, 12);
-                col(std::to_string(static_cast<long>(obj.at("memPeak"))), 10);
-                col(std::to_string(static_cast<long>(obj.at("memFinal"))), 10);
-                col(std::to_string(static_cast<double>(obj.at("timeDelta"))), 12);
-                col(input.as_view().slice(0, std::min((int) input.size(), 20)).data(), 20);
+
+                col(windowSize, defaultWidth);
+                col(stats.num_factors, defaultWidth);
+                col(stats.num_replaced, defaultWidth);
+                col(stats.num_unreplaced, defaultWidth);
+                col(stats.len_avg, defaultWidth);
+                col(stats.len_max, defaultWidth);
+                col(std::to_string(static_cast<long>(obj.at("memOff"))), defaultWidth);
+                col(std::to_string(static_cast<long>(obj.at("memPeak"))), defaultWidth);
+                col(std::to_string(static_cast<long>(obj.at("memFinal"))), defaultWidth);
+                col(std::to_string(static_cast<double>(obj.at("timeRun"))), defaultWidth);
+                row();
             }
 
             static void moveSlidingWindowRight(io::InputStream &stream,
@@ -94,9 +101,14 @@ namespace tdc {
 
 
 
+            // template<typename T>
+            // static void col(T t, const int &width) {
+            //     std::cout << std::left << std::setw(width) << std::setfill(' ') << t;
+            // }
+
             template<typename T>
             static void col(T t, const int &width) {
-                std::cout << std::left << std::setw(width) << std::setfill(' ') << t;
+                std::cout << '\t' << t;
             }
 
             static void row() {
