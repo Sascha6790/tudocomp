@@ -177,9 +177,7 @@ namespace tdc::lz77 {
             unsigned int blockAMatchedChars = 0;
             unsigned int blockBMaxLabel = 0;
             unsigned int blockBMatchedChars = 0;
-            bool blockAMore = false;
-            bool blockBMore = true;
-            bool read = true;
+
             DS *blockA;
             DS *blockB;
             StatPhase::wrap("Factorize Start", [&] { // caused valgrind problems.
