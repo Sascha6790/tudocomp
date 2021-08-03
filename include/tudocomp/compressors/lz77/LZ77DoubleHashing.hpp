@@ -51,7 +51,7 @@ namespace tdc::lz77 {
         }
 
         [[nodiscard]] inline std::unique_ptr<Decompressor> decompressor() const override {
-            return Algorithm::instance<LZSSDecompressor<lzss_coder_t>>();
+            return Algorithm::instance<LZSSDecompressor<lz77_coder>>();
         }
     };
 } //ns
