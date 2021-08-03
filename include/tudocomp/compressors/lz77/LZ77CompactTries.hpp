@@ -27,7 +27,7 @@
 namespace tdc::lz77 {
     using Comparator = bool (*)(WeightedNode<uint> *, uint, uint);
 
-    template<typename lzss_coder_t>
+    template<typename lz77_coder>
     class LZ77CompactTries : public Compressor {
 
     private:
@@ -134,10 +134,10 @@ namespace tdc::lz77 {
 
         inline static Meta meta() {
             Meta m(Compressor::type_desc(), "LZ77CompactTries", "Compute LZ77 Factors using Compact Tries");
-            m.param("coder", "The output encoder.").strategy<lzss_coder_t>(TypeDesc("lzss_coder"));
+            m.param("coder", "The output encoder.").strategy<lz77_coder>(TypeDesc("lzss_coder"));
             m.param("window", "The sliding window size").primitive(16);
             m.param("threshold", "The minimum factor length.").primitive(2);
-            m.inherit_tag<lzss_coder_t>(tags::lossy);
+            m.inherit_tag<lz77_coder>(tags::lossy);
             return m;
         }
 
@@ -164,7 +164,7 @@ namespace tdc::lz77 {
         inline void compress(Input &input, Output &output) override {
             StatPhase root("Root"); // causes valgrind problems.
             // initialize encoder
-            auto coder = lzss_coder_t(this->config().sub_config("coder")).encoder(output, NoLiterals());
+            auto coder = lz77_coder(this->config().sub_config("coder")).encoder(output, NoLiterals());
             // cod = &coder;
             coder.factor_length_range(Range(minFactorLength, 2 * windowSize));
             coder.encode_header();
@@ -351,7 +351,7 @@ namespace tdc::lz77 {
 
 
         [[nodiscard]] inline std::unique_ptr<Decompressor> decompressor() const override {
-            return Algorithm::instance<LZSSDecompressor<lzss_coder_t>>();
+            return Algorithm::instance<LZSSDecompressor<lz77_coder>>();
         }
     };
 } //ns

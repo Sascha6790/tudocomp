@@ -26,20 +26,18 @@
 
 namespace tdc::lz77 {
 
-    template<typename lzss_coder_t>
+    template<typename lz77_coder>
     class [[maybe_unused]] LZ77DoubleHashing : public Compressor {
 
     private:
 
     public:
-
-
         inline static Meta meta() {
             Meta m(Compressor::type_desc(), "LZ77CompactTries", "Compute LZ77 Factors using Compact Tries");
-            m.param("coder", "The output encoder.").strategy<lzss_coder_t>(TypeDesc("lzss_coder"));
+            m.param("coder", "The output encoder.").strategy<lz77_coder>(TypeDesc("lz77_coder"));
             m.param("window", "The sliding window size").primitive(16);
             m.param("threshold", "The minimum factor length.").primitive(2);
-            m.inherit_tag<lzss_coder_t>(tags::lossy);
+            m.inherit_tag<lz77_coder>(tags::lossy);
             return m;
         }
 
