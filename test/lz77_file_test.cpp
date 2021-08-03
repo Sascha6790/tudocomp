@@ -45,18 +45,19 @@ void decompressFile(const char *fileIn, const char *fileOut) {
 
 
 TEST(LZ77CompactTries, pc_proteins_1MB_ascii_compress_MultipleWindowSizes) {
-    for(int i = 4000; i <= 256000; i+=4000) {
+    for (int i = 4000; i <= 256000; i += 4000) {
         std::ostringstream outFile;
-        outFile <<  "/mnt/c/tudocomp/output/pc_proteins.1MB.ascii." << i << ".compressed";
+        outFile << "/mnt/c/tudocomp/output/pc_proteins.1MB.ascii." << i << ".compressed";
         compressFile("/mnt/c/tudocomp/datasets/pc_proteins.1MB",
                      outFile.str().c_str(),
                      i);
     }
 }
-TEST(LZ77CompactTries, pc_dblp_xml_10MB) {
-    for(int i = 4000; i <= 128000; i+=4000) {
+
+TEST(LZ77CompactTries, pc_dblp_xml_10MB_series) {
+    for (int i = 4000; i <= 128000; i += 4000) {
         std::ostringstream outFile;
-        outFile <<  "/mnt/c/tudocomp/output/pc_dblp.xml.10MB.ascii." << i << ".compressed";
+        outFile << "/mnt/c/tudocomp/output/pc_dblp.xml.10MB.ascii." << i << ".compressed";
         compressFile("/mnt/c/tudocomp/datasets/pc_dblp.xml.10MB",
                      outFile.str().c_str(),
                      i);
@@ -81,6 +82,12 @@ TEST(LZ77CompactTries, pc_proteins_1MB_ascii_compress_64k) {
                  64000);
 }
 
+TEST(LZ77CompactTries, pc_proteins_10MB_ascii_compress_64k) {
+    compressFile("/mnt/c/tudocomp/datasets/pc_proteins.10MB",
+                 "/mnt/c/tudocomp/output/pc_proteins.10MB.ascii.64k.compressed",
+                 64000);
+}
+
 
 TEST(LZ77CompactTries, pc_proteins_1MB_ascii_compress_80k) {
     compressFile("/mnt/c/tudocomp/datasets/pc_proteins.1MB",
@@ -102,11 +109,18 @@ TEST(LZ77CompactTries, pc_proteins_1MB_ascii_compress_128k) {
 
 TEST(LZ77CompactTries, large_commoncrawl_1Mb_compress) {
     compressFile("/mnt/c/tudocomp/datasets/large_commoncrawl_10240.ascii.1MB",
-                   "/mnt/c/tudocomp/output/large_commoncrawl_10240.ascii.1MB.64k.compressed",
-                   64000);
+                 "/mnt/c/tudocomp/output/large_commoncrawl_10240.ascii.1MB.64k.compressed",
+                 64000);
 }
+
 TEST(LZ77CompactTries, wiki_all_vital_txt_200MB) {
     compressFile("/mnt/c/tudocomp/datasets/wiki_all_vital.txt.200MB",
-                   "/mnt/c/tudocomp/output/wiki_all_vital.txt.200MB.64k.compressed",
-                   64000);
+                 "/mnt/c/tudocomp/output/wiki_all_vital.txt.200MB.64k.compressed",
+                 64000);
+}
+
+TEST(LZ77CompactTries, commonCrawl10GB) {
+    compressFile("/mnt/c/tudocomp/datasets/large_commoncrawl_10240.ascii.10240MB",
+                 "/mnt/c/tudocomp/output/large_commoncrawl_10240.ascii.10240MB.64k.compressed",
+                 64000);
 }

@@ -25,10 +25,9 @@
 #include "tudocomp/compressors/lz77/ds/CappedWeightedSuffixTree.hpp"
 
 namespace tdc::lz77 {
-    using Comparator = bool (*)(WeightedNode<uint> *, uint, uint);
 
     template<typename lzss_coder_t>
-    class LZ77CompactTries : public Compressor {
+    class LZ77DoubleHashing : public Compressor {
 
     private:
 
@@ -283,9 +282,8 @@ namespace tdc::lz77 {
             // delete blockB; // not needed because we swap pointers above and delete B there.
 
 
-            #ifdef STATS_ENABLED
-            LZ77Helper::printStats(input, root, streamPos, factors, windowSize);
-            #endif
+            // LZ77Helper::printStats(input, root, streamPos, factors, windowSize);
+
             // stats
 
         }
@@ -300,8 +298,8 @@ namespace tdc::lz77 {
         inline void addFactor(unsigned int offset, unsigned int edgeLabel, unsigned int length, auto &cod) const {
             // this->factors.emplace_back(offset, edgeLabel, length);
             cod.encode_factor(lzss::Factor(0, offset, length));
-            #ifdef STORE_VECTOR_ENABLED
-            fac->emplace_back(0, offset, length);
+            #ifdef STATS_ENABLED
+            // fac->emplace_back(0, offset, length);
             #endif
         }
 

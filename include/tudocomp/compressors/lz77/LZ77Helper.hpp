@@ -17,7 +17,7 @@
 #include <tudocomp/compressors/esp/MonotoneSubsequences.hpp>
 
 #ifndef STATS_DISABLED
-#define STATS_ENABLED
+    #define STATS_ENABLED
 #endif
 
 namespace tdc {
@@ -25,38 +25,40 @@ namespace tdc {
        class LZ77Helper {
         public:
             static void printStats(const Input &input, StatPhase &root, size_t positionInText, lzss::FactorBufferRAM factors, uint windowSize) {
-                json obj = root.to_json();
-                std::cout << obj;
-                row();
-                row();
-                row();
-                lzss::FactorizationStats stats(factors, positionInText);
-                stats.log();
+                #ifdef STATS_ENABLED
+                    json obj = root.to_json();
+                    std::cout << obj;
+                    row();
+                    row();
+                    row();
+                    lzss::FactorizationStats stats(factors, positionInText);
+                    stats.log();
 
-                const int defaultWidth = 20;
-                col("WindowSize", defaultWidth);
-                col("Factors", defaultWidth);
-                col("Replaced", defaultWidth);
-                col("Unreplaced", defaultWidth);
-                col("Length avg", defaultWidth);
-                col("Length max", defaultWidth);
-                col("memOff", defaultWidth);
-                col("memPeak", defaultWidth);
-                col("memFinal", defaultWidth);
-                col("timeRun", defaultWidth);
-                row();
+                    const int defaultWidth = 20;
+                    col("WindowSize", defaultWidth);
+                    col("Factors", defaultWidth);
+                    col("Replaced", defaultWidth);
+                    col("Unreplaced", defaultWidth);
+                    col("Length avg", defaultWidth);
+                    col("Length max", defaultWidth);
+                    col("memOff", defaultWidth);
+                    col("memPeak", defaultWidth);
+                    col("memFinal", defaultWidth);
+                    col("timeRun", defaultWidth);
+                    row();
 
-                col(windowSize, defaultWidth);
-                col(stats.num_factors, defaultWidth);
-                col(stats.num_replaced, defaultWidth);
-                col(stats.num_unreplaced, defaultWidth);
-                col(stats.len_avg, defaultWidth);
-                col(stats.len_max, defaultWidth);
-                col(std::to_string(static_cast<long>(obj.at("memOff"))), defaultWidth);
-                col(std::to_string(static_cast<long>(obj.at("memPeak"))), defaultWidth);
-                col(std::to_string(static_cast<long>(obj.at("memFinal"))), defaultWidth);
-                col(std::to_string(static_cast<double>(obj.at("timeRun"))), defaultWidth);
-                row();
+                    col(windowSize, defaultWidth);
+                    col(stats.num_factors, defaultWidth);
+                    col(stats.num_replaced, defaultWidth);
+                    col(stats.num_unreplaced, defaultWidth);
+                    col(stats.len_avg, defaultWidth);
+                    col(stats.len_max, defaultWidth);
+                    col(std::to_string(static_cast<long>(obj.at("memOff"))), defaultWidth);
+                    col(std::to_string(static_cast<long>(obj.at("memPeak"))), defaultWidth);
+                    col(std::to_string(static_cast<long>(obj.at("memFinal"))), defaultWidth);
+                    col(std::to_string(static_cast<double>(obj.at("timeRun"))), defaultWidth);
+                    row();
+                #endif
             }
 
             static void moveSlidingWindowRight(io::InputStream &stream,
