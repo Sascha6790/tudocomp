@@ -98,17 +98,17 @@ namespace tdc::lz77 {
             }
 
 
-            static void constructInverseSuffixArray(const int *suffixArray, int *inverseSuffixArray, uint dsSize) {
+            inline static void constructInverseSuffixArray(const int *suffixArray, int *inverseSuffixArray, uint dsSize) {
                 for (int i = 0; i < dsSize; i++) {
                     inverseSuffixArray[suffixArray[i]] = i;
                 }
             }
 
-            static void constructSuffixArray(const char *buffer, int *suffixArray, uint size) {
+            inline static void constructSuffixArray(const char *buffer, int *suffixArray, uint size) {
                 divsufsort(reinterpret_cast<const sauchar_t *> (buffer), suffixArray, size);
             }
 
-            static void constructLcpArray(const char *buffer,
+            inline static void constructLcpArray(const char *buffer,
                                           const int *suffixArray,
                                           const int *inverseSuffixArray,
                                           int *lcpArray,
@@ -204,7 +204,7 @@ namespace tdc::lz77 {
                                                 return node->minLabel < index;
                                             });
                         if (blockAMatchedChars > 0) {
-                            addFactor(offset - node->minLabel, node->minLabel, blockAMatchedChars, coder);
+                            addFactor(offset - node->minLabel, blockAMatchedChars, coder);
                             offset += blockAMatchedChars;
                         } else {
                             addLiteral(buffer[offset], coder);
@@ -240,13 +240,13 @@ namespace tdc::lz77 {
                                 ++offset;
                             } else {
                                 // minLabel is within second window => offset - nodeB->minLabel
-                                addFactor(offset - nodeB->minLabel, nodeB->minLabel, blockBMatchedChars,
+                                addFactor(offset - nodeB->minLabel, blockBMatchedChars,
                                           coder);
                                 offset += blockBMatchedChars;
                             }
                         } else [[likely]] {
                             // minLabel is within first window => windowSize - nodeA->maxLabel + offset
-                            addFactor(windowSize - nodeA->maxLabel + offset, nodeA->maxLabel, blockAMatchedChars,
+                            addFactor(windowSize - nodeA->maxLabel + offset, blockAMatchedChars,
                                       coder);
                             offset += blockAMatchedChars;
                         }
@@ -267,7 +267,7 @@ namespace tdc::lz77 {
                         auto node = getEdge(blockA, blockA->second, offset, blockAMaxLabel, blockAMatchedChars,
                                             [](WeightedNode<uint> *node, uint index) { return true; });
                         if (blockAMatchedChars > 0) {
-                            addFactor(windowSize - node->maxLabel + offset, node->maxLabel, blockAMatchedChars, coder);
+                            addFactor(windowSize - node->maxLabel + offset, blockAMatchedChars, coder);
                             offset += blockAMatchedChars;
                         } else {
                             addLiteral(blockA->second[offset], coder);
@@ -297,8 +297,7 @@ namespace tdc::lz77 {
         }
 
         [[gnu::always_inline]]
-        inline void addFactor(unsigned int offset, unsigned int edgeLabel, unsigned int length, auto &cod) const {
-            // this->factors.emplace_back(offset, edgeLabel, length);
+        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) const {
             cod.encode_factor(lzss::Factor(0, offset, length));
             #ifdef STORE_VECTOR_ENABLED
             fac->emplace_back(0, offset, length);
