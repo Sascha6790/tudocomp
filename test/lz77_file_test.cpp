@@ -1,5 +1,6 @@
 #include <tudocomp/compressors/lz77/LZ77Skeleton.hpp>
 #include <tudocomp/compressors/lz77/LZ77CompactTries.hpp>
+#include <tudocomp/compressors/lz77/LZ77StreamingCoder.hpp>
 #include "test/util.hpp"
 
 using namespace tdc;
@@ -20,7 +21,7 @@ void compressFile(const char *fileIn, const char *fileOut, uint windowSize) {
 
     auto compressor = m_registry.select
             <lz77::LZ77CompactTries<
-                    lzss::LZ77StreamingCoder<
+                    lz77::LZ77StreamingCoder<
                             BinaryCoder,
                             BinaryCoder,
                             BinaryCoder>>>(m_options);
@@ -36,7 +37,7 @@ void decompressFile(const char *fileIn, const char *fileOut) {
 
 
     auto decompressor = m_registry.select<lz77::LZ77CompactTries<
-            lzss::LZ77StreamingCoder<
+            lz77::LZ77StreamingCoder<
                     BinaryCoder,
                     BinaryCoder,
                     BinaryCoder>>>(options)->decompressor();

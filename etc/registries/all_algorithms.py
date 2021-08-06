@@ -39,6 +39,14 @@ non_consuming_coders = universal_coders + entropy_coders
 # All coders
 all_coders = universal_coders + entropy_coders + consuming_entropy_coders
 
+
+# lz77
+lz77_coders = [
+    AlgorithmConfig(name="lzss::DidacticalCoder", header="compressors/lzss/DidacticalCoder.hpp"),
+    AlgorithmConfig(name="lz77::LZ77StreamingCoder", header="compressors/lz77/LZ77StreamingCoder.hpp",
+                    sub=[universal_coders,universal_coders,universal_coders]),
+]
+
 ##### LZSS Coding Strategies #####
 lzss_streaming_coders = [
     AlgorithmConfig(name="lzss::DidacticalCoder", header="compressors/lzss/DidacticalCoder.hpp"),

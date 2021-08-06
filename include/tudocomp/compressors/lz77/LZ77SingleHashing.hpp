@@ -27,7 +27,7 @@
 namespace tdc::lz77 {
 
     template<typename lz77_coder>
-    class [[maybe_unused]] LZ77DoubleHashing : public Compressor {
+    class [[maybe_unused]] LZ77SingleHashing : public Compressor {
 
     private:
         const uint HASH_BITS; // dSize: pow(2,HASH_BITS)
@@ -61,7 +61,7 @@ namespace tdc::lz77 {
         }
 
 
-        inline explicit LZ77DoubleHashing(Config &&c) : Compressor(std::move(c)),
+        inline explicit LZ77SingleHashing(Config &&c) : Compressor(std::move(c)),
                                                         HASH_BITS(this->config().param("HASH_BITS").as_uint()),
                                                         MIN_MATCH(this->config().param("MIN_MATCH").as_uint()),
                                                         MAX_MATCH(this->config().param("MAX_MATCH").as_uint()),
@@ -287,7 +287,7 @@ namespace tdc::lz77 {
             coder.encode_literal(literal);
         }
 
-        inline LZ77DoubleHashing() = delete;
+        inline LZ77SingleHashing() = delete;
 
         [[nodiscard]] inline std::unique_ptr<Decompressor> decompressor() const override {
             return Algorithm::instance<LZSSDecompressor<lz77_coder >>();

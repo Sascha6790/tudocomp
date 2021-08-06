@@ -18,7 +18,7 @@
 #include <tudocomp/compressors/esp/MonotoneSubsequences.hpp>
 #include <divsufsort.h>
 #include <tudocomp/coders/ASCIICoder.hpp>
-#include <tudocomp/compressors/lzss/LZ77StreamingCoder.hpp>
+#include <tudocomp/compressors/lz77/LZ77StreamingCoder.hpp>
 #include <tudocomp/coders/BinaryCoder.hpp>
 #include <tudocomp/coders/EliasDeltaCoder.hpp>
 #include "tudocomp/compressors/lz77/LZ77Helper.hpp"

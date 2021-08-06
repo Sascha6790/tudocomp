@@ -69,7 +69,7 @@ struct Context: ContextBase<Context<Prev, T, F>, T> {
 
         if (cx.min_index != size_t(-1)) {
             for (size_t i = 0; i < (cx.min_index - cx.offset); i++) {
-                cx.buffer.pop_front();
+                cx.window.pop_front();
             }
             cx.offset += (cx.min_index - cx.offset);
         }

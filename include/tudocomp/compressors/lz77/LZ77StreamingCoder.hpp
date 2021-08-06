@@ -4,7 +4,7 @@
 #include <tudocomp/compressors/lzss/LZSSCoder.hpp>
 
 namespace tdc {
-namespace lzss {
+namespace lz77 {
 
 /// \brief Stream coding strategy.
 ///
@@ -13,9 +13,9 @@ namespace lzss {
 ///
 /// Naturally, this only allows for references to prior positions in the text.
 template<typename ref_coder_t, typename len_coder_t, typename lit_coder_t>
-class LZ77StreamingCoder : public LZSSCoder<ref_coder_t, len_coder_t, lit_coder_t> {
+class LZ77StreamingCoder : public lzss::LZSSCoder<ref_coder_t, len_coder_t, lit_coder_t> {
 private:
-    using super_t = LZSSCoder<ref_coder_t, len_coder_t, lit_coder_t>;
+    using super_t = lzss::LZSSCoder<ref_coder_t, len_coder_t, lit_coder_t>;
 
 public:
     inline static Meta meta() {
@@ -58,7 +58,7 @@ public:
             m_lenc->flush();
         }
 
-        inline void encode_factor(Factor f) {
+        inline void encode_factor(lzss::Factor f) {
 
             m_litc->encode(true, bit_r); // 1-bit to indicate factor
             m_litc->flush(); // context switch

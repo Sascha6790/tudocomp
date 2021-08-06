@@ -31,7 +31,7 @@ namespace tdc {
         uint depth = 0;
 
         WeightedNode *rightmost = nullptr;
-        std::map<char, WeightedNode *> childNodes;
+        std::map<char, WeightedNode *> childNodes; // std::unordered_map requires (for our use-case) more space and increases run time.
         T minLabel = std::numeric_limits<T>::max();
         T maxLabel = 0;
 
