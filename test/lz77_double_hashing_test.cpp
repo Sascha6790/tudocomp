@@ -1,4 +1,5 @@
 #include <tudocomp/compressors/lz77/LZ77SingleHashing.hpp>
+#include <tudocomp/compressors/lz77/LZ77DoubleHashing.hpp>
 #include "test/util.hpp"
 
 using namespace tdc;
@@ -32,4 +33,10 @@ TEST(lz77, SingleHashingRoundtrip) {
     const std::string orig = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
     const std::string input = "3:5:0c0b0a0b0c13:5:13:5:0b0c116:5:0b0c0c0b0a0b0c13:5:13:5:0b0c0b0a0b0c13:3";
     decompress<lz77::LZ77SingleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, orig, "HASH_BITS=4,MAX_MATCH=5");
+}
+
+TEST(lz77, DoubleHashCompress) {
+    const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
+    auto result = test::compress<lz77::LZ77DoubleHashing<coder>>(input, "HASH_BITS=4,MAX_MATCH=5");
+    ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
 }

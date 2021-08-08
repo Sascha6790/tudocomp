@@ -81,15 +81,6 @@ namespace tdc::lz77 {
             memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
         }
 
-        [[gnu::always_inline]]
-        inline void longestMatch(uint strstart, uint currentMatch) {
-            uint max = strstart > MAX_DIST ? strstart - MAX_DIST : 0;
-            uint matchLength = MIN_MATCH - 1;
-            do {
-
-            } while ((currentMatch = prev[currentMatch & WMASK]) > max);
-        }
-
         inline void compress(Input &input, Output &output) override {
             auto coder = lz77_coder(this->config().sub_config("coder")).encoder(output, NoLiterals());
             coder.factor_length_range(Range(MIN_MATCH, MAX_MATCH));
@@ -132,8 +123,8 @@ namespace tdc::lz77 {
                             // TODO optimize: ignore first 3 chars ?
 
                             // iterate over chars and match them. (slow ! use double hashing here.)
-                            uint max = std::min(MAX_MATCH, lookahead);
-                            while (currentMatchCount < max &&
+                            uint maxLen = std::min(MAX_MATCH, lookahead);
+                            while (currentMatchCount < maxLen &&
                                    window[currentMatchPos++] == window[currentStrPos++]) {
                                 ++currentMatchCount;
                             }
@@ -176,13 +167,6 @@ namespace tdc::lz77 {
 
                 }
 
-
-                if (strstart < WINDOW_SIZE) [[unlikely]] {
-                    //--------------------------------------
-                    // |-------w1----s---|--------w2-------|
-                    //--------------------------------------
-                    // throw new std::logic_error("start of string < WINDOW_SIZE. Can't fill Lookahead");
-                }
                 //--------------------------------------
                 // |-------w1--------|---s----w2-------| // s = strstart
                 //--------------------------------------
@@ -201,14 +185,7 @@ namespace tdc::lz77 {
 
                 // shift head and prev
                 // TODO can be zeroed out if strstart == 0
-                uint h = HASH_TABLE_SIZE;
-                while (h-- > 0) {
-                    head[h] = head[h] > strstart ? head[h] - strstart : 0;
-                }
-                h = WINDOW_SIZE;
-                while (h-- > 0) {
-                    prev[h] = prev[h] > strstart ? prev[h] - strstart : 0;
-                }
+                reconstructTables(strstart);
                 // update start and lookahead
                 strstart = 0;
 
@@ -226,6 +203,17 @@ namespace tdc::lz77 {
             delete[] head;
             delete[] prev;
 
+        }
+
+        void reconstructTables(uint strstart) {
+            uint h = HASH_TABLE_SIZE;
+            while (h-- > 0) {
+                head[h] = head[h] > strstart ? head[h] - strstart : 0;
+            }
+            h = WINDOW_SIZE;
+            while (h-- > 0) {
+                prev[h] = prev[h] > strstart ? prev[h] - strstart : 0;
+            }
         }
 
         [[gnu::always_inline]]
