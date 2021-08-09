@@ -1,6 +1,7 @@
 #include <tudocomp/compressors/lz77/LZ77Skeleton.hpp>
 #include <tudocomp/compressors/lz77/LZ77CompactTries.hpp>
 #include <tudocomp/compressors/lz77/LZ77StreamingCoder.hpp>
+#include <tudocomp/compressors/lz77/LZ77DoubleHashing.hpp>
 #include "test/util.hpp"
 
 using namespace tdc;
@@ -25,8 +26,20 @@ void compressFile(const char *fileIn, const char *fileOut, uint windowSize) {
 }
 
 template<class C>
-void decompressFile(const char *fileIn, const char *fileOut) {
-    auto options = "window=64000";
+void compressFile(const char *fileIn, const char *fileOut, std::string options) {
+    auto m_options = options;
+    auto m_registry = RegistryOf<Compressor>();
+
+    Input text_in((Path(fileIn)));
+    Output encoded_out((Path(fileOut)));
+
+    auto compressor = m_registry.select
+            <C>(m_options);
+    compressor->compress(text_in, encoded_out);
+}
+
+template<class C>
+void decompressFile(const char *fileIn, const char *fileOut, std::string options) {
     auto m_registry = RegistryOf<Compressor>();
 
     Input text_in((Path(fileIn)));
@@ -165,4 +178,45 @@ TEST(LZ77CompactTries, commonCrawl10GB) {
                     BinaryCoder>>>("/mnt/c/tudocomp/datasets/large_commoncrawl_10240.ascii.10240MB",
                  "/mnt/c/tudocomp/output/large_commoncrawl_10240.ascii.10240MB.64k.compressed",
                  64000);
+}
+
+
+TEST(LZ77DoubleHashing, wiki_all_vital_1Mb_binary_compress) {
+    uint bits = 15;
+    uint maxMatch = 258;
+    compressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    BinaryCoder,
+                    BinaryCoder,
+                    BinaryCoder>>>("/mnt/c/tudocomp/datasets/wiki_all_vital.txt.ascii.1MB",
+                                   "/mnt/c/tudocomp/output/wiki_all_vital.binary.1MB.15bit.compressed",
+                                   "HASH_BITS=15,MAX_MATCH=258");
+}
+TEST(LZ77DoubleHashing, wiki_all_vitall_1Mb_ascii_compress) {
+    compressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    ASCIICoder,
+                    ASCIICoder,
+                    ASCIICoder>>>("/mnt/c/tudocomp/datasets/wiki_all_vital.txt.1MB",
+                                   "/mnt/c/tudocomp/output/wiki_all_vital.ascii.1MB.15bit.compressed",
+                                   "HASH_BITS=15,MAX_MATCH=258");
+}
+
+TEST(LZ77DoubleHashing, wiki_all_vital_1Mb_binary_decompress) {
+    decompressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    BinaryCoder,
+                    BinaryCoder,
+                    BinaryCoder>>>("/mnt/c/tudocomp/output/wiki_all_vital.binary.1MB.15bit.compressed",
+                                   "/mnt/c/tudocomp/output/wiki_all_vital.binary.1MB.15bit.decompressed",
+                                   "HASH_BITS=15,MAX_MATCH=258");
+}
+TEST(LZ77DoubleHashing, wiki_all_vital_1Mb_ascii_decompress) {
+    decompressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    ASCIICoder,
+                    ASCIICoder,
+                    ASCIICoder>>>("/mnt/c/tudocomp/output/wiki_all_vital.ascii.1MB.15bit.compressed",
+                                   "/mnt/c/tudocomp/output/wiki_all_vital.ascii.1MB.15bit.decompressed",
+                                   "HASH_BITS=15,MAX_MATCH=258");
 }
