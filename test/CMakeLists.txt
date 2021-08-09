@@ -64,7 +64,9 @@ run_test(intsort_tests DEPS ${BASIC_DEPS})
 run_test(lz77_compact_tries_test  DEPS ${BASIC_DEPS})
 run_test(lz77_file_test  DEPS ${BASIC_DEPS})
 run_test(lz77_wst_test  DEPS ${BASIC_DEPS})
+run_test(lz77_single_hashing_test  DEPS ${BASIC_DEPS})
 run_test(lz77_double_hashing_test  DEPS ${BASIC_DEPS})
+run_test(lz77_suffix_sorting_test  DEPS ${BASIC_DEPS})
 
 
 set(SANDBOX_CPP ${CMAKE_CURRENT_SOURCE_DIR}/sandbox_tests.cpp)

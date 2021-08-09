@@ -1,4 +1,4 @@
-#include <tudocomp/compressors/lz77/LZ77DoubleHashing.hpp>
+#include <tudocomp/compressors/lz77/LZ77SingleHashing.hpp>
 #include "test/util.hpp"
 
 using namespace tdc;
@@ -22,10 +22,16 @@ void decompress(const std::string compressedTest, std::string originalText, std:
     ASSERT_EQ(originalText, decompressed_text);
 }
 
-TEST(lz77, DoubleHashCompress) {
+TEST(lz77, SingleHashCompress) {
     const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
-    auto result = test::compress<lz77::LZ77DoubleHashing<coder>>(input, "HASH_BITS=4,MAX_MATCH=5");
+    auto result = test::compress<lz77::LZ77SingleHashing<coder>>(input, "HASH_BITS=4,MAX_MATCH=5");
     ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
+}
+
+TEST(lz77, decompressAscii) {
+    const std::string orig = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
+    const std::string input = "3:5:0c0b0a0b0c13:5:13:5:0b0c116:5:0b0c0c0b0a0b0c13:5:13:5:0b0c0b0a0b0c13:3";
+    decompress<lz77::LZ77SingleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, orig, "HASH_BITS=4,MAX_MATCH=5");
 }
 
 TEST(lz77, ExampleWikiText) {
@@ -41,6 +47,6 @@ TEST(lz77, ExampleWikiText) {
                               "The following table enumerates the twelve divisions of celestial longitude, with the Latin names (still widely used) and the English translation (gloss). The longitude intervals, being a mathematical division, are closed for the first endpoint (\"a\") and open for the second (\"b\") — for instance, 30° of longitude is the first point of Taurus, not part of Aries. Association of calendar dates with astrological signs only makes sense when referring to Sun sign astrology.\n"
                               "Empedocles, a fifth-century BC Greek philosopher, identified Fire, Earth, Air, and Water as elements. He explained the nature of the universe as an interaction of two opposing principles called love and strife manipulating the four elements, and stated that these four elements were all equal, of the same age, that each rules its own province, and each possesses its own individual character. Different mixtures of these elements produced the different natures of things. Empedocles said that those who were born with near equal proportions of the four elements are more intelligent and have the most exact perceptions.\n"
                               ;
-    auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=15,MAX_MATCH=258");
-    decompress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(result.str, input, "");
+    auto result = test::compress<lz77::LZ77SingleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=15,MAX_MATCH=258");
+    decompress<lz77::LZ77SingleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(result.str, input, "");
 }

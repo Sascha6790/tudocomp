@@ -64,7 +64,7 @@ namespace tdc::lz77 {
         inline explicit LZ77SingleHashing(Config &&c) : Compressor(std::move(c)),
                                                         HASH_BITS(this->config().param("HASH_BITS").as_uint()),
                                                         MIN_MATCH(this->config().param("MIN_MATCH").as_uint()),
-                                                        MAX_MATCH(this->config().param("MAX_MATCH").as_uint()),
+                                                        MAX_MATCH(std::pow(2, (int) HASH_BITS / 2) + 1),
                                                         H_SHIFT((HASH_BITS + MIN_MATCH - 1) / MIN_MATCH),
                                                         WINDOW_SIZE(1 << HASH_BITS),
                                                         HASH_TABLE_SIZE(WINDOW_SIZE),
