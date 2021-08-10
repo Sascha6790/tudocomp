@@ -1,3 +1,5 @@
+#include <tudocomp/compressors/lzss/DidacticalCoder.hpp>
+#include <tudocomp/compressors/lz77/LZ77SuffixSorting.hpp>
 #include "test/util.hpp"
 
 using namespace tdc;
@@ -23,6 +25,6 @@ void decompress(const std::string compressedTest, std::string originalText, std:
 
 TEST(lz77, SuffixSortingInitialTest) {
     const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
-    auto result = test::compress<lz77::LZ77SuffixSorting<coder>>(input, "HASH_BITS=4");
-    ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
+    auto result = test::compress<lz77::LZ77SuffixSorting<lzss::DidacticalCoder>>(input, "HASH_BITS=4");
+    ASSERT_EQ(result.str, "cbabc{3, 12}b{7, 6}cb{8, 6}{6, 8}cb{7, 6}");
 }

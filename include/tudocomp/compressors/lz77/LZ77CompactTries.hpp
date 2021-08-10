@@ -97,17 +97,19 @@ namespace tdc::lz77 {
                 delete[] buffer;
             }
 
-
+            [[gnu::always_inline]]
             inline static void constructInverseSuffixArray(const int *suffixArray, int *inverseSuffixArray, uint dsSize) {
                 for (int i = 0; i < dsSize; i++) {
                     inverseSuffixArray[suffixArray[i]] = i;
                 }
             }
 
+            [[gnu::always_inline]]
             inline static void constructSuffixArray(const char *buffer, int *suffixArray, uint size) {
                 divsufsort(reinterpret_cast<const sauchar_t *> (buffer), suffixArray, size);
             }
 
+            [[gnu::always_inline]]
             inline static void constructLcpArray(const char *buffer,
                                           const int *suffixArray,
                                           const int *inverseSuffixArray,
@@ -161,6 +163,7 @@ namespace tdc::lz77 {
             // Since we don't want to deal with three buffers, we'll just use one buffer with a size of 3w.
         }
 
+        [[gnu::hot]]
         inline void compress(Input &input, Output &output) override {
             StatPhase root("Root"); // causes valgrind problems.
             // initialize encoder

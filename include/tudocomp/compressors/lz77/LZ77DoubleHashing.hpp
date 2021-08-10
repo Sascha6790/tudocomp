@@ -199,9 +199,6 @@ namespace tdc::lz77 {
 
                         // decide wether we got a literal or a factor.
                         if (isLiteral(maxMatchCount)) {
-                            if (maxMatchCount > 1) {
-                                std::cout << "debug";
-                            }
                             addLiteralWord(&window[position], maxMatchCount, coder);
                         } else [[likely]] {
                             addFactor(position - maxMatchPos, maxMatchCount, coder);
@@ -243,13 +240,7 @@ namespace tdc::lz77 {
                     reconstructTables(position, std::min(lookahead, WINDOW_SIZE));
                     position = 0;
 
-                    if (!stream.good()) {
-                        // lookahead < MIN_LOOKAHEAD but no bytes left.
-                        if (!(lookahead > MIN_LOOKAHEAD)) {
-                            isLastBlock = true;
-                        }
-                        // lookahead = 0; // temporary exit criteria
-                    }
+                    isLastBlock = !stream.good() && lookahead <= MIN_LOOKAHEAD;
                 }
             });
 
@@ -306,6 +297,7 @@ namespace tdc::lz77 {
                 ++tmp[h1];
             }
             // calculate phash and hashw from head (h1-hashes)
+            // Remark: paper uses a different approach: keep hashw and reset only on specific conditions.
             uint h = 0;
             uint b;
             for (i = 0; i < HASH_TABLE_SIZE; i++) {

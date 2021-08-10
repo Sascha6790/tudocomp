@@ -31,28 +31,17 @@ namespace tdc::lz77 {
 
     private:
         const uint HASH_BITS; // dSize: pow(2,HASH_BITS)
-
         const uint WINDOW_SIZE; // default: 2^15     size of dictionary
-        const uint HASH_TABLE_SIZE; // default: 2^15
-
-        const uint MIN_MATCH; // default: 3 MIN_MATCH
-        const uint MAX_MATCH; //default: 258 MAX_MATCH
-        const uint HASH_MASK;
-        const uint H_SHIFT;
-        const uint WMASK;
-        const uint MIN_LOOKAHEAD;
-        const uint MAX_DIST;
 
         char *window;
+        int *suffixArray;
+        int *inverseSuffixArray;
+        int *lcpArray;
 
-        uint h1;
-        uint h2;
-        uint H2;
-        uint *head; // head[base + h2] <- h2 = f2(p)
-        uint *prev;
-        uint *tmp;
-        uint *hashw; // b = hashw[h1] : number of characters to calc the secondary hash
-        uint *phash; // base = phash[h1]
+        const float ALPHA = 0.5;
+        const uint MIN_MATCH = 3;
+        const uint MIN_LOOKAHEAD;
+        const uint DS_SIZE;
 
         #ifdef STATS_ENABLED
         lzss::FactorBufferRAM factors;
@@ -74,311 +63,192 @@ namespace tdc::lz77 {
 
         inline explicit LZ77SuffixSorting(Config &&c) : Compressor(std::move(c)),
                                                         HASH_BITS(this->config().param("HASH_BITS").as_uint()),
-                                                        MIN_MATCH(this->config().param("MIN_MATCH").as_uint()),
-                                                        MAX_MATCH(std::pow(2, (int) HASH_BITS / 2) + 1),
-                                                        H_SHIFT((HASH_BITS + MIN_MATCH - 1) / MIN_MATCH),
                                                         WINDOW_SIZE(1 << HASH_BITS),
-                                                        HASH_TABLE_SIZE(WINDOW_SIZE),
-                                                        HASH_MASK(HASH_TABLE_SIZE - 1),
-                                                        WMASK(WINDOW_SIZE - 1),
-                                                        MIN_LOOKAHEAD(MAX_MATCH + MIN_MATCH + 1),
-                                                        MAX_DIST(WINDOW_SIZE - MIN_LOOKAHEAD) {
+                                                        MIN_LOOKAHEAD(WINDOW_SIZE),
+                                                        DS_SIZE((int) ((1 + ALPHA) *
+                                                                       WINDOW_SIZE))// TODO verify MIN_LOOKAHEAD value
+
+        {
             #ifdef STATS_ENABLED
             fac = &factors;
             #endif
 
-            assert(MIN_LOOKAHEAD < WINDOW_SIZE);
-            window = new char[2 * WINDOW_SIZE];
-            head = new unsigned[HASH_TABLE_SIZE];
-            tmp = new unsigned[HASH_TABLE_SIZE];
-            hashw = new unsigned[HASH_TABLE_SIZE];
-            phash = new unsigned[HASH_TABLE_SIZE];
-            prev = new unsigned[WINDOW_SIZE];
-            // zero mem
-            memset(head, 0, sizeof(unsigned) * HASH_TABLE_SIZE);
-            memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
+            assert(MIN_LOOKAHEAD <= WINDOW_SIZE);
+            window = new char[DS_SIZE];
+            suffixArray = new int[DS_SIZE];
+            inverseSuffixArray = new int[DS_SIZE];
+            lcpArray = new int[DS_SIZE];
         }
 
         inline LZ77SuffixSorting() = delete;
 
+
+        [[gnu::always_inline]]
+        inline int lcp(int q, int j) {
+            q = inverseSuffixArray[q];
+            j = inverseSuffixArray[j];
+
+            // don't use recursion in favor of inlining.
+            if(q > j) {
+                int tmp = q;
+                q = j;
+                j = tmp;
+            }
+
+            int max = INT_MAX;
+            while (q++ < j) {
+                max = std::min(lcpArray[q], max);
+            }
+            return max == INT_MAX ? 0 : max;
+        }
 
         [[gnu::hot]]
         inline void compress(Input &input, Output &output) override {
             StatPhase root("Root"); // causes valgrind problems.
 
             auto coder = lz77_coder(this->config().sub_config("coder")).encoder(output, NoLiterals());
-            coder.factor_length_range(Range(MIN_MATCH, MAX_MATCH));
+            coder.factor_length_range(Range(MIN_MATCH, WINDOW_SIZE)); // TODO check if WINDOW_SIZE is enough.
             coder.encode_header();
             tdc::io::InputStream stream = input.as_stream();
 
+            // windowPosition
             uint position = 0;
+            // substringPosition
+            uint suffixPosition = 0;
             uint lookahead;
 
             uint maxMatchPos;
-            uint numberOfBlocks;
-            uint blockOffset;
-            uint totalListsToSearch;
-            uint maxLen;
             uint maxMatchCount;
-            uint currentList;
-            uint currentMatchPos;
-            uint currentMatchCount;
-            uint currentStrPos;
+            uint currentLcpValue; //current lcp (length) value
+            uint currentSuffixValue; // suffixArray value
+            uint currentInverseSuffixValue;
+
+            int inversePositionLower;
+            int inversePositionUpper;
 
             // isLastBlock equals true, when the stream reached EOF, gcount returned 0 and lookahead > 0
-            bool isLastBlock = false;
+            bool eof = false;
 
             // initialize window
-            stream.read(&window[0], 2 * WINDOW_SIZE);
+            stream.read(&window[0], DS_SIZE);
             lookahead = stream.gcount();
 
-            // calculate and count hashes
-            StatPhase::wrap("Init Hashes", [&] {
-                calculateHashes(std::min(lookahead, WINDOW_SIZE));
-            });
+            // StatPhase::wrap("Init Hashes", [&] {
+            initDatastructures(lookahead);
+            // });
 
             #ifdef STATS_ENABLED
             streamPos += lookahead;
             #endif
 
-            StatPhase::wrap("Factorize", [&] {
-                while (lookahead > 0) {
-                    while (lookahead > MIN_LOOKAHEAD || (isLastBlock && lookahead > 0)) {
-                        nextHash(position);
+            // StatPhase::wrap("Factorize", [&] {
+            while (!eof) {
+                while (position < DS_SIZE) {
 
-                        // reset
-                        maxMatchPos = 0;
-                        numberOfBlocks = hashw[h1];
-                        blockOffset = 0;
-                        totalListsToSearch = 1;
-                        maxLen = std::min(MAX_MATCH, lookahead);
-                        maxMatchCount = 1;
+                    // nextHash(position);
+                    assert(lookahead > 0);
+                    suffixPosition = position;
 
-                        // Loop over every List, start with the "Best" lists, increase the number of lists step by step.
-                        for (uint block = 0; block <= numberOfBlocks; block++) {
-                            for (; blockOffset < totalListsToSearch; blockOffset++) {
-                                currentList = head[phash[h1] + (h2 ^ blockOffset)] & WMASK;
-                                if (currentList != 0 && prev[currentList] != 0) {
-                                    // reset for current list
-                                    currentStrPos = position;
-                                    currentMatchCount = 0;
-                                    currentMatchPos = prev[currentList];
+                    currentInverseSuffixValue = inverseSuffixArray[suffixPosition]; // inverseSuffixArray value
 
-                                    // trivial comparison of two positions.
-                                    while (currentMatchCount < maxLen &&
-                                           window[currentMatchPos] == window[currentStrPos]) {
-                                        ++currentMatchCount;
-                                        ++currentMatchPos;
-                                        ++currentStrPos;
-                                    }
+                    maxMatchCount = 0; // max lcp (length) value
+                    maxMatchPos = 0; // position match, use highest position on same lcp length
+                    inversePositionLower = currentInverseSuffixValue - 1;
+                    inversePositionUpper = currentInverseSuffixValue + 2;
 
-                                    // the while loop above increases the positions even though the next char might not match.
-                                    // check and decrease if necessary.
-                                    if (window[currentMatchPos] != window[currentStrPos]) {
-                                        --currentMatchPos;
-                                        --currentStrPos;
-                                    }
-
-                                    // is the current match also the best match so far ?
-                                    if (currentMatchCount > maxMatchCount) {
-                                        maxMatchCount = currentMatchCount;
-                                        maxMatchPos = prev[currentList];
-                                    }
-                                }
+                    while (window[suffixPosition] == window[suffixArray[inversePositionLower]]) {
+                        currentSuffixValue = suffixArray[inversePositionLower];
+                        if ((WINDOW_SIZE > suffixPosition || suffixPosition - WINDOW_SIZE <= currentSuffixValue) && currentSuffixValue < suffixPosition) {
+                            currentLcpValue = lcp(currentSuffixValue, suffixPosition);
+                            if (currentLcpValue > maxMatchCount || (currentLcpValue == maxMatchCount && currentSuffixValue > maxMatchPos)) {
+                                maxMatchCount = currentLcpValue;
+                                maxMatchPos = currentSuffixValue;
                             }
-                            if (maxMatchCount >= maxLen) {
+                            if (currentLcpValue < maxMatchCount) {
                                 break;
                             }
-
-                            // Increase number of (searchable) lists by a factor of 4
-                            totalListsToSearch <<= 2;
-                            maxLen = MAX_MATCH + numberOfBlocks - block - 1;
                         }
+                        --inversePositionLower;
+                    }
 
-                        assert(maxMatchCount > 0);
-
-                        // decide wether we got a literal or a factor.
-                        if (isLiteral(maxMatchCount)) {
-                            if (maxMatchCount > 1) {
-                                std::cout << "debug";
+                    while (inversePositionUpper < DS_SIZE && window[suffixPosition] == window[suffixArray[inversePositionUpper]]) {
+                        currentSuffixValue = suffixArray[inversePositionUpper];
+                        if (suffixPosition - WINDOW_SIZE <= currentSuffixValue && currentSuffixValue < suffixPosition) {
+                            currentLcpValue = lcp(currentSuffixValue, suffixPosition);
+                            if (currentLcpValue > maxMatchCount || (currentLcpValue == maxMatchCount && currentSuffixValue > maxMatchPos)) {
+                                maxMatchCount = currentLcpValue;
+                                maxMatchPos = currentSuffixValue;
                             }
-                            addLiteralWord(&window[position], maxMatchCount, coder);
-                        } else [[likely]] {
-                            addFactor(position - maxMatchPos, maxMatchCount, coder);
+                            if (currentLcpValue < maxMatchCount) {
+                                break;
+                            }
                         }
-
-                        // reduce lookahead by the number of matched characters.
-                        lookahead -= maxMatchCount;
-
-                        // calculate hashes for every position that got matched.
-                        // move cursor by the number of matched characters.
-                        // skip first character because we already calculated that one.
-                        ++position;
-                        --maxMatchCount;
-                        while (maxMatchCount != 0) {
-                            nextHash(position++);
-                            --maxMatchCount;
-                        }
+                        ++inversePositionUpper;
                     }
-                    //--------------------------------------
-                    // |-------w1--------|---s----w2-------| // s = position
-                    //--------------------------------------
-                    memcpy(&window[0], &window[position], 2 * WINDOW_SIZE - position);
-                    //--------------------------------------
-                    // |s----w2-------xxx|---s----w2-------|    // x = old bytes which weren't moved. second window untouched.
-                    //--------------------------------------
-                    uint readBytes = 0;
-                    if (stream.good()) { // relevant for last bytes. skip moving memory.
-                        stream.read(&window[2 * WINDOW_SIZE - position], position);
-                        readBytes = stream.gcount();
-                        #ifdef STATS_ENABLED
-                        streamPos += readBytes;
-                        #endif
-                    }
-                    //--------------------------------------
-                    // |s----w2-------yyy|yyyyyyyyyyyyyyyyyy|    // y = new bytes, second window overwritten.
-                    //--------------------------------------
 
-                    lookahead += readBytes;
-                    reconstructTables(position, std::min(lookahead, WINDOW_SIZE));
-                    position = 0;
-
-                    if (!stream.good()) {
-                        // lookahead < MIN_LOOKAHEAD but no bytes left.
-                        if (!(lookahead > MIN_LOOKAHEAD)) {
-                            isLastBlock = true;
-                        }
-                        // lookahead = 0; // temporary exit criteria
+                    // reset
+                    if(maxMatchCount == 0) {
+                        ++maxMatchCount;
                     }
+
+                    // decide wether we got a literal or a factor.
+                    assert(maxMatchCount > 0);
+                    if (isLiteral(maxMatchCount)) {
+                        addLiteralWord(&window[position], maxMatchCount, coder);
+                    } else [[likely]] {
+                        addFactor(suffixPosition - maxMatchPos, maxMatchCount, coder);
+                    }
+
+                    // reduce lookahead by the number of matched characters.
+                    lookahead -= maxMatchCount;
+                    position += maxMatchCount;
                 }
-            });
+
+
+                position = ALPHA * WINDOW_SIZE;
+                memcpy(&window[0], &window[position], DS_SIZE - position);
+
+                uint readBytes = 0;
+                if (stream.good()) { // relevant for last bytes. skip moving memory.
+                    stream.read(&window[DS_SIZE - position], position);
+                    readBytes = stream.gcount();
+                    #ifdef STATS_ENABLED
+                    streamPos += readBytes;
+                    #endif
+                }
+
+                if(readBytes > 0) {
+                    lookahead = WINDOW_SIZE + readBytes;
+                    initDatastructures(lookahead);
+                    position = WINDOW_SIZE;
+                } else {
+                    eof = true;
+                }
+            }
+            // });
 
             StatPhase::wrap("Factorize Cleanup", [&] {
                 delete[] window;
-                delete[] head;
-                delete[] prev;
-                delete[] hashw;
-                delete[] phash;
-                delete[] tmp;
+                delete[] suffixArray;
+                delete[] inverseSuffixArray;
+                delete[] lcpArray;
             });
 
         }
 
         [[gnu::always_inline]]
         inline void reconstructTables(uint position, uint bytesInWindow) {
-            // since I am moving the lookahead to &window[0], head and prev will be zero after the next two loops.
-            // TODO: there's room for optimization.
-            //  -> don't more strstart to &window[0] but instead to &window[strstart-WINDOW_SIZE]
-            uint h = HASH_TABLE_SIZE;
-            while (h-- > 0) {
-                head[h] = head[h] > position ? head[h] - position : 0;
-            }
-            h = WINDOW_SIZE;
-            while (h-- > 0) {
-                prev[h] = prev[h] > position ? prev[h] - position : 0;
-            }
-
-            calculateHashes(bytesInWindow);
+            // initDatastructures(bytesInWindow);
         }
 
         [[gnu::always_inline]]
-        inline void nextHash(uint position) {
-            calculateH1(position);
-            calculateH2Ex(position);
-            uint base = phash[h1];
-            prev[position & WMASK] = head[base + h2] & WMASK;
-            head[base + h2] = position; // updates h1
+        inline void initDatastructures(uint bytesInWindow) {
+            assert(DS_SIZE <= bytesInWindow); // TODO handle case.
+            constructSuffixArray(window, suffixArray, DS_SIZE);
+            constructInverseSuffixArray(suffixArray, inverseSuffixArray, DS_SIZE);
+            constructLcpArray(window, suffixArray, inverseSuffixArray, lcpArray, DS_SIZE);
         }
 
-        [[gnu::always_inline]]
-        inline void calculateHashes(uint bytesInWindow) {
-            assert(bytesInWindow <= WINDOW_SIZE);
-            // reset to zeroes.
-            memset(tmp, 0, sizeof(unsigned) * HASH_TABLE_SIZE);
-
-            if (bytesInWindow <= MIN_MATCH) {
-                return;
-            }
-            // count h1-hashes by value and store the result in head/tmp.
-            uint i;
-            for (i = 0; i <= bytesInWindow - MIN_MATCH; i++) {
-                calculateH1(i);
-                ++tmp[h1];
-            }
-            // calculate phash and hashw from head (h1-hashes)
-            uint h = 0;
-            uint b;
-            for (i = 0; i < HASH_TABLE_SIZE; i++) {
-                phash[i] = h;
-                if (tmp[i] > 0) {
-                    b = (int) ((int) (log2(tmp[i])) / 2);
-                    hashw[i] = b;
-                    h += pow(2, 2 * b);
-                } else {
-                    hashw[i] = 0;
-                }
-            }
-        }
-
-        [[gnu::always_inline]]
-        inline uint f3(uint pos) {
-            return window[pos] & 3;
-        }
-
-        /**
-         * used to generate H2 for the whole window.
-         * H2 requires an update after moving the window.
-         *
-         * Remark: NOT WORKING !
-         * can't read the whole window because int or event long long don't have enough bytes to
-         * represent a number with WINDOW_SIZE bits. However, it's possible to read MIN_MATCH + max(hashw) and adjust accordingly,
-         * because h1 gets generated by MIN_MATCH characters and h2 by hashw
-         *
-         */
-        [[gnu::always_inline]]
-        inline void initH2() {
-            H2 = 0;
-            for (uint j = MIN_MATCH; j < MIN_MATCH + (int) (HASH_BITS / 2); j++) {
-                H2 = ((H2 << 2) + f3(j)) & WMASK;
-            }
-        }
-
-
-        // call on every move of the window
-        [[gnu::always_inline]]
-        inline void updateH2(uint pos) {
-            H2 = ((H2 << 2) + f3(pos + WINDOW_SIZE)) & WMASK;
-        }
-
-
-        [[gnu::always_inline]]
-        inline void calculateH2(uint pos) {
-            h2 = H2 >> 2 * ((int) (HASH_BITS / 2) - hashw[h1]);
-        }
-
-        [[gnu::always_inline]]
-        inline void calculateH2Ex(uint pos) {
-            // uint len = (int) (HASH_BITS / 2) - hashw[h1];
-            uint len = hashw[h1];
-            h2 = 0;
-            for (uint j = pos; j < pos + len; j++) {
-                h2 = ((h2 << 2) + f3(j)) & WMASK;
-            }
-
-        }
-
-        [[gnu::always_inline]]
-        inline void calculateH1(uint pos) {
-            h1 = 0;
-            for (uint j = 0; j < MIN_MATCH; j++) {
-                h1 = ((h1 << H_SHIFT) ^ window[j + pos]) & HASH_MASK;
-            }
-        }
-
-        [[gnu::always_inline]]
-        inline static void constructSuffixArray(const char *buffer, int *suffixArray, uint size) {
-            divsufsort(reinterpret_cast<const sauchar_t *> (buffer), suffixArray, size);
-        }
 
         [[gnu::always_inline]]
         inline void addFactor(unsigned int offset, unsigned int length, auto &cod) const {
@@ -405,6 +275,43 @@ namespace tdc::lz77 {
         inline void
         addLiteral(uliteral_t literal, auto &coder) const {
             coder.encode_literal(literal);
+        }
+
+        [[gnu::always_inline]]
+        inline static void constructSuffixArray(const char *buffer, int *suffixArray, uint size) {
+            divsufsort(reinterpret_cast<const sauchar_t *> (buffer), suffixArray, size);
+        }
+
+        [[gnu::always_inline]]
+        inline static void constructInverseSuffixArray(const int *suffixArray, int *inverseSuffixArray, uint dsSize) {
+            for (int i = 0; i < dsSize; i++) {
+                inverseSuffixArray[suffixArray[i]] = i;
+            }
+        }
+
+
+        [[gnu::always_inline]]
+        inline static void constructLcpArray(const char *buffer,
+                                             const int *suffixArray,
+                                             const int *inverseSuffixArray,
+                                             int *lcpArray,
+                                             uint dsSize) {
+            int h = 0;
+            int j;
+            lcpArray[0] = 0;
+            // calculate height
+            for (int i = 0; i < dsSize; i++) {
+                if (inverseSuffixArray[i] > 0) {
+                    j = suffixArray[inverseSuffixArray[i] - 1];
+                    while (std::max(i + h, j + h) < dsSize && buffer[i + h] == buffer[j + h]) {
+                        h++;
+                    }
+                    lcpArray[inverseSuffixArray[i]] = h;
+                    if (h > 0) {
+                        h--;
+                    }
+                }
+            }
         }
 
         [[nodiscard]] inline std::unique_ptr<Decompressor> decompressor() const override {
