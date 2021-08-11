@@ -90,7 +90,7 @@ namespace tdc::lz77 {
             memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
 
             if (COMPRESSION_MODE != 1) {
-                if (WINDOW_SIZE - MIN_LOOKAHEAD < WINDOW_SIZE) {
+                if (WINDOW_SIZE - MIN_LOOKAHEAD <= MIN_LOOKAHEAD) {
                     COMPRESSION_MODE = 1; //default to COMPRESSION_MODE 1 if COMPRESSION_MODE 2 is not available.
                 }
             }
@@ -113,136 +113,147 @@ namespace tdc::lz77 {
             bool isLastBlock = false;
 
             StatPhase root("Root"); // causes valgrind problems.
-            StatPhase::wrap("Factorize", [&] { // caused valgrind problems.
-                // init
-                stream.read(&window[0], 2 * WINDOW_SIZE);
-                uint lookahead = stream.gcount();
+            // StatPhase::wrap("Factorize", [&] { // caused valgrind problems.
+            // init
+            stream.read(&window[0], 2 * WINDOW_SIZE);
+            uint lookahead = stream.gcount();
 
-                while (lookahead > 0) {
-                    while (lookahead > MIN_LOOKAHEAD || (isLastBlock && lookahead > 0)) {
-                        maxMatchPos = 0;
+            while (lookahead > 0) {
+                while (lookahead > MIN_LOOKAHEAD || (isLastBlock && lookahead > 0)) {
+                    maxMatchPos = 0;
 
+                    f1(strstart);
+                    prev[strstart & WMASK] = head[hashHead];
+                    head[hashHead] = strstart; // updates h1
+
+                    if (hashHead != 0 && canReadMaximumLength(strstart)) {
+                        // store results for current iteraton
+                        uint currentMatchPos;
+                        uint currentMatchCount = 0;
+                        // init iteration variables
+                        uint currentHead = strstart;
+                        uint currentStrPos;
+                        uint oldHead = 2 * WINDOW_SIZE;
+
+                        // if currentMatchCount of the previous iteration equals the maximum match -> break loop
+                        while (oldHead > currentHead && prev[currentHead & WMASK] != 0 &&
+                               currentMatchCount != MAX_MATCH && lookahead > 0) {
+                            // init
+                            currentStrPos = strstart;
+                            currentMatchCount = 0;
+                            currentMatchPos = prev[currentHead & WMASK];
+
+                            // TODO optimize: ignore first 3 chars ?
+
+                            // iterate over chars and match them. (slow ! use double hashing here.)
+                            uint maxLen = std::min(MAX_MATCH, lookahead);
+                            while (currentMatchCount < maxLen &&
+                                   window[currentMatchPos++] == window[currentStrPos++]) {
+                                ++currentMatchCount;
+                            }
+                            // the while loop above increases the positions even though the next char might not match. check and decrease if necessary.
+                            if (window[currentMatchPos] != window[currentStrPos]) {
+                                --currentMatchPos;
+                                --currentStrPos;
+                            }
+                            // update best match
+                            if (currentMatchCount > maxMatchCount) {
+                                maxMatchCount = currentMatchCount;
+                                maxMatchPos = prev[currentHead & WMASK];
+                            }
+                            oldHead = currentHead;
+                            currentHead = prev[currentHead & WMASK];
+                        }
+                    }
+                    if (!isLiteral(maxMatchCount)) {
+                        addFactor(strstart - maxMatchPos, maxMatchCount, coder);
+                        lookahead -= maxMatchCount;
+                    } else {
+                        if (maxMatchCount == 0) {
+                            maxMatchCount = 1; // add at least one char as Literal !
+                        }
+                        addLiteralWord(&window[strstart], maxMatchCount, coder);
+                        lookahead -= maxMatchCount;
+                    }
+                    --maxMatchCount; // don't parse the current strstart position, skip it. only parse the rest of the matching.
+                    ++strstart;
+
+                    // calculate skipped head and prev values caused by a matched string.
+                    while (maxMatchCount != 0) {
                         f1(strstart);
                         prev[strstart & WMASK] = head[hashHead];
                         head[hashHead] = strstart; // updates h1
-
-                        if (hashHead != 0 && canReadMaximumLength(strstart)) {
-                            // store results for current iteraton
-                            uint currentMatchPos;
-                            uint currentMatchCount = 0;
-                            // init iteration variables
-                            uint currentHead = strstart;
-                            uint currentStrPos;
-                            uint oldHead = 2 * WINDOW_SIZE;
-
-                            // if currentMatchCount of the previous iteration equals the maximum match -> break loop
-                            while (oldHead > currentHead && prev[currentHead & WMASK] != 0 &&
-                                   currentMatchCount != MAX_MATCH && lookahead > 0) {
-                                // init
-                                currentStrPos = strstart;
-                                currentMatchCount = 0;
-                                currentMatchPos = prev[currentHead & WMASK];
-
-                                // TODO optimize: ignore first 3 chars ?
-
-                                // iterate over chars and match them. (slow ! use double hashing here.)
-                                uint maxLen = std::min(MAX_MATCH, lookahead);
-                                while (currentMatchCount < maxLen &&
-                                       window[currentMatchPos++] == window[currentStrPos++]) {
-                                    ++currentMatchCount;
-                                }
-                                // the while loop above increases the positions even though the next char might not match. check and decrease if necessary.
-                                if (window[currentMatchPos] != window[currentStrPos]) {
-                                    --currentMatchPos;
-                                    --currentStrPos;
-                                }
-                                // update best match
-                                if (currentMatchCount > maxMatchCount) {
-                                    maxMatchCount = currentMatchCount;
-                                    maxMatchPos = prev[currentHead & WMASK];
-                                }
-                                oldHead = currentHead;
-                                currentHead = prev[currentHead & WMASK];
-                            }
-                        }
-                        if (!isLiteral(maxMatchCount)) {
-                            addFactor(strstart - maxMatchPos, maxMatchCount, coder);
-                            lookahead -= maxMatchCount;
-                        } else {
-                            if (maxMatchCount == 0) {
-                                maxMatchCount = 1; // add at least one char as Literal !
-                            }
-                            addLiteralWord(&window[strstart], maxMatchCount, coder);
-                            lookahead -= maxMatchCount;
-                        }
-                        --maxMatchCount; // don't parse the current strstart position, skip it. only parse the rest of the matching.
                         ++strstart;
-
-                        // calculate skipped head and prev values caused by a matched string.
-                        while (maxMatchCount != 0) {
-                            f1(strstart);
-                            prev[strstart & WMASK] = head[hashHead];
-                            head[hashHead] = strstart; // updates h1
-                            ++strstart;
-                            --maxMatchCount;
-                        }
-                        assert(maxMatchCount == 0);
-
+                        --maxMatchCount;
                     }
-                    uint readBytes = 0;
-                    if (COMPRESSION_MODE == 1) {
-                        //--------------------------------------
-                        // |-------w1--------|---s----w2-------| // s = strstart
-                        //--------------------------------------
-                        memcpy(&window[0], &window[strstart], 2 * WINDOW_SIZE - strstart);
-                        //--------------------------------------
-                        // |s----w2-------xxx|---s----w2-------|    // x = old bytes which weren't moved. second window untouched.
-                        //--------------------------------------
-                        if (stream.good()) { // relevant for last bytes. skip moving memory.
-                            stream.read(&window[2 * WINDOW_SIZE - strstart], strstart);
-                            readBytes = stream.gcount();
-                        }
-                        //--------------------------------------
-                        // |s----w2-------yyy|yyyyyyyyyyyyyyyyyy|    // y = new bytes, second window overwritten.
-                        //--------------------------------------
+                    assert(maxMatchCount == 0);
 
-                        // shift head and prev
-                        // TODO can be zeroed out if strstart == 0
-                        reconstructTables(strstart);
-                    } else {
-                        //--------------------------------------
-                        // |-------w1--------|---s----w2-------| // s = strstart
-                        //--------------------------------------
-                        assert(strstart >= WINDOW_SIZE);
-                        memcpy(&window[strstart - WINDOW_SIZE], &window[strstart], 2 * WINDOW_SIZE - strstart);
-                        //--------------------------------------
-                        // |s----w2-------xxx|---s----w2-------|    // x = old bytes which weren't moved. second window untouched.
-                        //--------------------------------------
-                        if (stream.good()) { // relevant for last bytes. skip moving memory.
-                            stream.read(&window[2 * WINDOW_SIZE - strstart], strstart);
-                            readBytes = stream.gcount();
-                        }
-                        //--------------------------------------
-                        // |s----w2-------yyy|yyyyyyyyyyyyyyyyyy|    // y = new bytes, second window overwritten.
-                        //--------------------------------------
+                }
+                uint readBytes = 0;
+                if (COMPRESSION_MODE == 1) {
+                    // Strategy 1
+                    // copy everything, that is not yet processed to window[0] !
+                    // PRO: fast, no need to adjust head and prev tables.
+                    // CON: misses a few factors.
+                    memcpy(&window[0], &window[strstart], 2 * WINDOW_SIZE - strstart);
 
-                        // shift head and prev
-                        // TODO can be zeroed out if strstart == 0
-                        reconstructTables(strstart);
+                    // replenish window
+                    if (stream.good()) { // relevant for last bytes. skip moving memory.
+                        stream.read(&window[2 * WINDOW_SIZE - strstart], strstart);
+                        readBytes = stream.gcount();
                     }
-                    // update start and lookahead
+
+                    // reset tables !
+                    memset(head, 0, sizeof(unsigned) * HASH_TABLE_SIZE);
+                    memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
                     strstart = 0;
+                } else {
+                    // Strategy 2
+                    // move exactly WINDOW_SIZE bytes
+                    // FROM:
+                    //--------------------------------------
+                    // |-----------------|+++s++++++++++++++| // s = strstart
+                    //--------------------------------------
+                    // TO:
+                    //--------------------------------------
+                    // |+++s+++++++++++++|xxxxxxxxxxxxxxxxxx|    // x has to be replaced by new bytes.
+                    //--------------------------------------
+                    // Preserve bytes before s and update hashtables accorindly
+                    // PRO: can use matches that got calculated before.
+                    // CON: slower than just trashing head and prev tables.
+                    if (strstart >= WINDOW_SIZE) {
+                        memcpy(&window[0], &window[WINDOW_SIZE], WINDOW_SIZE);
 
-                    lookahead += readBytes;
-                    if (!stream.good()) {
-                        // lookahead < MIN_LOOKAHEAD but no bytes left.
-                        if (!(lookahead > MIN_LOOKAHEAD)) {
-                            isLastBlock = true;
+                        if (stream.good()) { // relevant for last bytes. skip moving memory.
+                            stream.read(&window[WINDOW_SIZE], WINDOW_SIZE);
+                            readBytes = stream.gcount();
                         }
-                        // lookahead = 0; // temporary exit criteria
+
+                        uint h = HASH_TABLE_SIZE;
+                        while (h-- > 0) {
+                            head[h] = head[h] > WINDOW_SIZE ? head[h] - WINDOW_SIZE : 0;
+                        }
+                        h = WINDOW_SIZE;
+                        while (h-- > 0) {
+                            prev[h] = prev[h] > WINDOW_SIZE ? prev[h] - WINDOW_SIZE : 0;
+                        }
+
+                        strstart -= WINDOW_SIZE;
+                    } else {
+                        assert(lookahead == 0); // exit criteria, isLastBlock will be set.
                     }
                 }
-            });
+
+
+                lookahead += readBytes;
+                if (!stream.good()) {
+                    // lookahead < MIN_LOOKAHEAD but no bytes left.
+                    if (!(lookahead > MIN_LOOKAHEAD)) {
+                        isLastBlock = true;
+                    }
+                }
+            }
+            // });
             #ifdef STATS_ENABLED
             LZ77Helper::printStats(input, root, streampos, factors, WINDOW_SIZE);
             #endif
@@ -253,16 +264,6 @@ namespace tdc::lz77 {
 
         }
 
-        void reconstructTables(uint strstart) {
-            uint h = HASH_TABLE_SIZE;
-            while (h-- > 0) {
-                head[h] = head[h] > strstart ? head[h] - strstart : 0;
-            }
-            h = WINDOW_SIZE;
-            while (h-- > 0) {
-                prev[h] = prev[h] > strstart ? prev[h] - strstart : 0;
-            }
-        }
 
         [[gnu::always_inline]]
         inline bool canReadMaximumLength(ulong strstart) const {
