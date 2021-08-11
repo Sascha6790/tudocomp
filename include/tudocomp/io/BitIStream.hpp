@@ -118,7 +118,7 @@ public:
     inline bool eof() const {
         // If there are no more bytes, and all bits from the current buffer are read,
         // we are done
-        return m_is_final && (m_cursor <= (MSB - m_final_bits));
+       return m_is_final && (m_cursor <= (MSB - m_final_bits));
     }
 
     /// \brief Reads the next single bit from the input.

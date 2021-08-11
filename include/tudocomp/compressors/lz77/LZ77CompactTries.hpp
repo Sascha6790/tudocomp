@@ -38,11 +38,12 @@ namespace tdc::lz77 {
 
         int i, j, h;
         const int dsSize, bufSize;
+        const int MIN_MATCH = 3;
 
+        std::streampos streamPos = 0;
         #ifdef STATS_ENABLED
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
-        std::streampos streamPos = 0;
         #endif
     public:
         class DS {
@@ -98,7 +99,8 @@ namespace tdc::lz77 {
             }
 
             [[gnu::always_inline]]
-            inline static void constructInverseSuffixArray(const int *suffixArray, int *inverseSuffixArray, uint dsSize) {
+            inline static void
+            constructInverseSuffixArray(const int *suffixArray, int *inverseSuffixArray, uint dsSize) {
                 for (int i = 0; i < dsSize; i++) {
                     inverseSuffixArray[suffixArray[i]] = i;
                 }
@@ -111,10 +113,10 @@ namespace tdc::lz77 {
 
             [[gnu::always_inline]]
             inline static void constructLcpArray(const char *buffer,
-                                          const int *suffixArray,
-                                          const int *inverseSuffixArray,
-                                          int *lcpArray,
-                                          uint dsSize) {
+                                                 const int *suffixArray,
+                                                 const int *inverseSuffixArray,
+                                                 int *lcpArray,
+                                                 uint dsSize) {
                 int h = 0;
                 int j;
                 lcpArray[0] = 0;
@@ -169,7 +171,7 @@ namespace tdc::lz77 {
             // initialize encoder
             auto coder = lz77_coder(this->config().sub_config("coder")).encoder(output, NoLiterals());
             // cod = &coder;
-            coder.factor_length_range(Range(minFactorLength, 2 * windowSize));
+            coder.factor_length_range(Range(1, 2 * windowSize));
             coder.encode_header();
 
             tdc::io::InputStream stream = input.as_stream();
@@ -188,16 +190,9 @@ namespace tdc::lz77 {
                 if (stream.good()) {
                     stream.read(&buffer[0], windowSize);
 
-                    #ifdef STATS_ENABLED
-                    streamPos += stream.gcount();
-                    #endif
-
                     StatPhase::wrap("blockA", [&] { // caused valgrind problems.
                         blockA = new DS(windowSize, &buffer[0], stream);
                     });
-                    #ifdef STATS_ENABLED
-                    streamPos += blockA->gcount;
-                    #endif
 
                     while (offset < blockA->windowSize) {
                         auto node = getEdge(blockA, blockA->buffer, offset, blockAMaxLabel, blockAMatchedChars,
@@ -222,9 +217,6 @@ namespace tdc::lz77 {
                 int middleSubPhase = 0;
                 while (stream.good()) {
                     blockB = new DS(windowSize, blockA->second, stream);
-                    #ifdef STATS_ENABLED
-                    streamPos += blockB->gcount;
-                    #endif
                     while (offset < windowSize) {
                         // optimized call to Comparator by templating, typedef and lambda call
                         auto nodeA = getEdge(blockA, blockB->buffer, offset, blockAMaxLabel, blockAMatchedChars,
@@ -292,14 +284,22 @@ namespace tdc::lz77 {
         }
 
         [[gnu::always_inline]]
-        inline void
-        addLiteral(uliteral_t literal, auto &cod) const {
-            cod.encode_literal(literal);
+        inline void addLiteralWord(const char *start, uint length, auto &coder) {
+            for (int q = 0; q < length; q++) {
+                addLiteral(start[q], coder);
+            }
         }
 
         [[gnu::always_inline]]
-        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) const {
+        inline void addLiteral(uliteral_t literal, auto &cod) {
+            cod.encode_literal(literal);
+            streamPos += 1;
+        }
+
+        [[gnu::always_inline]]
+        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
             cod.encode_factor(lzss::Factor(0, offset, length));
+            streamPos += length;
             #ifdef STORE_VECTOR_ENABLED
             fac->emplace_back(0, offset, length);
             #endif

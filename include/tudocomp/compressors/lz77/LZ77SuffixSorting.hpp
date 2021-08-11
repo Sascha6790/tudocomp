@@ -41,12 +41,11 @@ namespace tdc::lz77 {
         const float ALPHA = 0.5;
         const uint MIN_MATCH = 3;
         const uint MIN_LOOKAHEAD;
-        const uint DS_SIZE;
+        uint DS_SIZE; // should be const but it might change if the stream is too small. (edge case..)
 
         #ifdef STATS_ENABLED
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
-        std::streampos streamPos = 0;
         #endif
 
     public:
@@ -65,19 +64,12 @@ namespace tdc::lz77 {
                                                         HASH_BITS(this->config().param("HASH_BITS").as_uint()),
                                                         WINDOW_SIZE(1 << HASH_BITS),
                                                         MIN_LOOKAHEAD(WINDOW_SIZE),
-                                                        DS_SIZE((int) ((1 + ALPHA) *
-                                                                       WINDOW_SIZE))// TODO verify MIN_LOOKAHEAD value
-
-        {
+                                                        DS_SIZE((int) ((1 + ALPHA) * WINDOW_SIZE)) {
             #ifdef STATS_ENABLED
             fac = &factors;
             #endif
 
             assert(MIN_LOOKAHEAD <= WINDOW_SIZE);
-            window = new char[DS_SIZE];
-            suffixArray = new int[DS_SIZE];
-            inverseSuffixArray = new int[DS_SIZE];
-            lcpArray = new int[DS_SIZE];
         }
 
         inline LZ77SuffixSorting() = delete;
@@ -89,7 +81,7 @@ namespace tdc::lz77 {
             j = inverseSuffixArray[j];
 
             // don't use recursion in favor of inlining.
-            if(q > j) {
+            if (q > j) {
                 int tmp = q;
                 q = j;
                 j = tmp;
@@ -104,6 +96,11 @@ namespace tdc::lz77 {
 
         [[gnu::hot]]
         inline void compress(Input &input, Output &output) override {
+            window = new char[DS_SIZE];
+            suffixArray = new int[DS_SIZE];
+            inverseSuffixArray = new int[DS_SIZE];
+            lcpArray = new int[DS_SIZE];
+
             StatPhase root("Root"); // causes valgrind problems.
 
             auto coder = lz77_coder(this->config().sub_config("coder")).encoder(output, NoLiterals());
@@ -123,8 +120,8 @@ namespace tdc::lz77 {
             uint currentSuffixValue; // suffixArray value
             uint currentInverseSuffixValue;
 
-            int inversePositionLower;
-            int inversePositionUpper;
+            uint inversePositionLower;
+            uint inversePositionUpper;
 
             // isLastBlock equals true, when the stream reached EOF, gcount returned 0 and lookahead > 0
             bool eof = false;
@@ -133,107 +130,114 @@ namespace tdc::lz77 {
             stream.read(&window[0], DS_SIZE);
             lookahead = stream.gcount();
 
-            // StatPhase::wrap("Init Hashes", [&] {
-            initDatastructures(lookahead);
-            // });
-
-            #ifdef STATS_ENABLED
-            streamPos += lookahead;
-            #endif
-
-            // StatPhase::wrap("Factorize", [&] {
-            while (!eof) {
-                while (position < DS_SIZE) {
-
-                    // nextHash(position);
-                    assert(lookahead > 0);
-                    suffixPosition = position;
-
-                    currentInverseSuffixValue = inverseSuffixArray[suffixPosition]; // inverseSuffixArray value
-
-                    maxMatchCount = 0; // max lcp (length) value
-                    maxMatchPos = 0; // position match, use highest position on same lcp length
-                    inversePositionLower = currentInverseSuffixValue - 1;
-                    inversePositionUpper = currentInverseSuffixValue + 2;
-
-                    while (window[suffixPosition] == window[suffixArray[inversePositionLower]]) {
-                        currentSuffixValue = suffixArray[inversePositionLower];
-                        if ((WINDOW_SIZE > suffixPosition || suffixPosition - WINDOW_SIZE <= currentSuffixValue) && currentSuffixValue < suffixPosition) {
-                            currentLcpValue = lcp(currentSuffixValue, suffixPosition);
-                            if (currentLcpValue > maxMatchCount || (currentLcpValue == maxMatchCount && currentSuffixValue > maxMatchPos)) {
-                                maxMatchCount = currentLcpValue;
-                                maxMatchPos = currentSuffixValue;
-                            }
-                            if (currentLcpValue < maxMatchCount) {
-                                break;
-                            }
-                        }
-                        --inversePositionLower;
-                    }
-
-                    while (inversePositionUpper < DS_SIZE && window[suffixPosition] == window[suffixArray[inversePositionUpper]]) {
-                        currentSuffixValue = suffixArray[inversePositionUpper];
-                        if (suffixPosition - WINDOW_SIZE <= currentSuffixValue && currentSuffixValue < suffixPosition) {
-                            currentLcpValue = lcp(currentSuffixValue, suffixPosition);
-                            if (currentLcpValue > maxMatchCount || (currentLcpValue == maxMatchCount && currentSuffixValue > maxMatchPos)) {
-                                maxMatchCount = currentLcpValue;
-                                maxMatchPos = currentSuffixValue;
-                            }
-                            if (currentLcpValue < maxMatchCount) {
-                                break;
-                            }
-                        }
-                        ++inversePositionUpper;
-                    }
-
-                    // reset
-                    if(maxMatchCount == 0) {
-                        ++maxMatchCount;
-                    }
-
-                    // decide wether we got a literal or a factor.
-                    assert(maxMatchCount > 0);
-                    if (isLiteral(maxMatchCount)) {
-                        addLiteralWord(&window[position], maxMatchCount, coder);
-                    } else [[likely]] {
-                        addFactor(suffixPosition - maxMatchPos, maxMatchCount, coder);
-                    }
-
-                    // reduce lookahead by the number of matched characters.
-                    lookahead -= maxMatchCount;
-                    position += maxMatchCount;
-                }
-
-
-                position = ALPHA * WINDOW_SIZE;
-                memcpy(&window[0], &window[position], DS_SIZE - position);
-
-                uint readBytes = 0;
-                if (stream.good()) { // relevant for last bytes. skip moving memory.
-                    stream.read(&window[DS_SIZE - position], position);
-                    readBytes = stream.gcount();
-                    #ifdef STATS_ENABLED
-                    streamPos += readBytes;
-                    #endif
-                }
-
-                if(readBytes > 0) {
-                    lookahead = WINDOW_SIZE + readBytes;
-                    initDatastructures(lookahead);
-                    position = WINDOW_SIZE;
-                } else {
-                    eof = true;
-                }
-            }
-            // });
-
-            StatPhase::wrap("Factorize Cleanup", [&] {
-                delete[] window;
-                delete[] suffixArray;
-                delete[] inverseSuffixArray;
-                delete[] lcpArray;
+            StatPhase::wrap("Init Hashes", [&] {
+                initDatastructures(lookahead);
             });
 
+            StatPhase::wrap("Factorize", [&] {
+                while (!eof) {
+                    while (position < DS_SIZE && lookahead > 0) {
+                        assert(lookahead > 0);
+                        suffixPosition = position;
+
+                        currentInverseSuffixValue = inverseSuffixArray[suffixPosition];
+
+                        maxMatchCount = 0;
+                        maxMatchPos = 0;
+
+
+                        // process lower part of window[suffixArray[currentInverseSuffixValue]]
+                        if (currentInverseSuffixValue > 0) {
+                            inversePositionLower = currentInverseSuffixValue - 1;
+                            while (window[suffixPosition] == window[suffixArray[inversePositionLower]]) {
+                                currentSuffixValue = suffixArray[inversePositionLower];
+                                if ((WINDOW_SIZE > suffixPosition ||
+                                     suffixPosition - WINDOW_SIZE <= currentSuffixValue) &&
+                                    currentSuffixValue < suffixPosition) {
+                                    currentLcpValue = lcp(currentSuffixValue, suffixPosition);
+                                    if (currentLcpValue > maxMatchCount ||
+                                        (currentLcpValue == maxMatchCount && currentSuffixValue > maxMatchPos)) {
+                                        maxMatchCount = currentLcpValue;
+                                        maxMatchPos = currentSuffixValue;
+                                    }
+                                    if (currentLcpValue < maxMatchCount) {
+                                        break;
+                                    }
+                                }
+                                if (inversePositionLower == 0) {
+                                    break;
+                                }
+                                --inversePositionLower;
+                            }
+                        }
+
+                        // process upper part of window[suffixArray[currentInverseSuffixValue]]
+                        inversePositionUpper = currentInverseSuffixValue + 2;
+                        while (inversePositionUpper < DS_SIZE &&
+                               window[suffixPosition] == window[suffixArray[inversePositionUpper]]) {
+                            currentSuffixValue = suffixArray[inversePositionUpper];
+                            if (suffixPosition - WINDOW_SIZE <= currentSuffixValue &&
+                                currentSuffixValue < suffixPosition) {
+                                currentLcpValue = lcp(currentSuffixValue, suffixPosition);
+                                if (currentLcpValue > maxMatchCount ||
+                                    (currentLcpValue == maxMatchCount && currentSuffixValue > maxMatchPos)) {
+                                    maxMatchCount = currentLcpValue;
+                                    maxMatchPos = currentSuffixValue;
+                                }
+                                if (currentLcpValue < maxMatchCount) {
+                                    break;
+                                }
+                            }
+                            ++inversePositionUpper;
+                        }
+
+                        // reset
+                        if (maxMatchCount == 0) {
+                            ++maxMatchCount;
+                        }
+
+                        // decide wether we got a literal or a factor.
+                        assert(maxMatchCount > 0);
+                        if (isLiteral(maxMatchCount)) {
+                            addLiteralWord(&window[position], maxMatchCount, coder);
+
+                        } else [[likely]] {
+                            addFactor(suffixPosition - maxMatchPos, maxMatchCount, coder);
+                        }
+
+                        // reduce lookahead by the number of matched characters.
+                        lookahead -= maxMatchCount;
+                        position += maxMatchCount;
+                    }
+
+
+                    position = ALPHA * WINDOW_SIZE;
+                    if (DS_SIZE > position) {
+                        memcpy(&window[0], &window[position], DS_SIZE - position);
+                    }
+                    uint readBytes = 0;
+                    if (stream.good()) { // relevant for last bytes. skip moving memory.
+                        stream.read(&window[DS_SIZE - position], position);
+                        readBytes = stream.gcount();
+                    }
+
+                    if (readBytes > 0) {
+                        if (readBytes != ALPHA * WINDOW_SIZE) {
+                            std::cout << "check";
+                        }
+                        lookahead = readBytes;
+                        initDatastructures(WINDOW_SIZE + lookahead);
+                        position = WINDOW_SIZE;
+                    } else {
+                        eof = true;
+                    }
+                }
+            });
+
+            delete[] window;
+            delete[] suffixArray;
+            delete[] inverseSuffixArray;
+            delete[] lcpArray;
         }
 
         [[gnu::always_inline]]
@@ -243,7 +247,12 @@ namespace tdc::lz77 {
 
         [[gnu::always_inline]]
         inline void initDatastructures(uint bytesInWindow) {
-            assert(DS_SIZE <= bytesInWindow); // TODO handle case.
+            // update DS_SIZE, possible scenarios:
+            //      -   stream size is smaller than initial DS_SIZE
+            //      -   stream size at the end is smaller than ALPHA * WINDOW_SIZE
+            DS_SIZE = bytesInWindow;
+
+            // construct arrays
             constructSuffixArray(window, suffixArray, DS_SIZE);
             constructInverseSuffixArray(suffixArray, inverseSuffixArray, DS_SIZE);
             constructLcpArray(window, suffixArray, inverseSuffixArray, lcpArray, DS_SIZE);
@@ -252,6 +261,9 @@ namespace tdc::lz77 {
 
         [[gnu::always_inline]]
         inline void addFactor(unsigned int offset, unsigned int length, auto &cod) const {
+            if (offset > DS_SIZE) {
+                std::cout << "check";
+            }
             cod.encode_factor(lzss::Factor(0, offset, length));
             #ifdef STORE_VECTOR_ENABLED
             fac->emplace_back(0, offset, length);

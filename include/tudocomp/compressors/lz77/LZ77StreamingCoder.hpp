@@ -32,6 +32,7 @@ public:
         std::unique_ptr<lenc_t> m_lenc;
         std::unique_ptr<litc_t> m_litc;
         Range m_flen_r;
+        std::streampos fpos = 0;
 
     public:
         /// \brief Constructor.
@@ -62,15 +63,17 @@ public:
 
             m_litc->encode(true, bit_r); // 1-bit to indicate factor
             m_litc->flush(); // context switch
-            m_refc->encode(f.src, Range(1, f.src)); // delta
+            m_refc->encode(f.src , Range(1, fpos)); // delta
             m_refc->flush(); // context switch
             m_lenc->encode(f.len, m_flen_r);
             m_lenc->flush(); // context switch
+            fpos+=f.len;
         }
 
         inline void encode_literal(uliteral_t c) {
             m_litc->encode(false, bit_r); // 0-bit to indicate literal
             m_litc->encode(c, literal_r);
+            fpos+=1;
             // no context switch here - make good use of potential runs!
         }
 
@@ -123,7 +126,8 @@ public:
             while(!m_litd->eof()) {
                 auto is_factor = m_litd->template decode<bool>(bit_r);
                 if(is_factor) {
-                    size_t fsrc = p - m_refd->template decode<size_t>(Range(1, p));
+                    auto m = m_refd->template decode<size_t>(Range(1, p));
+                    size_t fsrc = p - m;
                     size_t flen = m_lend->template decode<size_t>(flen_r);
 
                     decomp.decode_factor(fsrc, flen);

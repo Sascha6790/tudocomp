@@ -140,8 +140,13 @@ public:
     /// \return The decoded integer value.
     template<typename value_t>
     inline value_t decode(const Range& r) {
-        return value_t(r.min()) +
-               m_in->read_int<value_t>(bits_for(r.max() - r.min()));
+        auto m = r.min();
+        auto m1 = value_t(r.min());
+        auto m2 = r.max();
+        auto m3 = r.max() - r.min();
+        auto m4 = bits_for(r.max() - r.min());
+        auto m5 = m_in->read_int<value_t>(bits_for(r.max() - r.min()));
+        return value_t(r.min()) +m5;
     }
 
     /// \brief Decodes a bit.

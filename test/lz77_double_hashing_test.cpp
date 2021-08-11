@@ -1,5 +1,7 @@
 #include <tudocomp/compressors/lz77/LZ77DoubleHashing.hpp>
+#include <tudocomp/compressors/lzss/StreamingCoder.hpp>
 #include "test/util.hpp"
+#include <cstring>
 
 using namespace tdc;
 using coder = lzss::DidacticalCoder;
@@ -24,8 +26,8 @@ void decompress(const std::string compressedTest, std::string originalText, std:
 
 TEST(lz77, DoubleHashCompress) {
     const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
-    auto result = test::compress<lz77::LZ77DoubleHashing<coder>>(input, "HASH_BITS=4,MAX_MATCH=5");
-    ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
+    auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=4,MAX_MATCH=5");
+    result.assert_decompress();
 }
 
 TEST(lz77, ExampleWikiText) {
@@ -42,5 +44,5 @@ TEST(lz77, ExampleWikiText) {
                               "Empedocles, a fifth-century BC Greek philosopher, identified Fire, Earth, Air, and Water as elements. He explained the nature of the universe as an interaction of two opposing principles called love and strife manipulating the four elements, and stated that these four elements were all equal, of the same age, that each rules its own province, and each possesses its own individual character. Different mixtures of these elements produced the different natures of things. Empedocles said that those who were born with near equal proportions of the four elements are more intelligent and have the most exact perceptions.\n"
                               ;
     auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=15,MAX_MATCH=258");
-    decompress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(result.str, input, "");
+    decompress<lz77::LZ77DoubleHashing<lzss::StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(result.str, input, "");
 }

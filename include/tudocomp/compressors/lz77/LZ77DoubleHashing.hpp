@@ -57,7 +57,7 @@ namespace tdc::lz77 {
         #ifdef STATS_ENABLED
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
-        std::streampos streamPos = 0;
+
         #endif
 
     public:
@@ -136,10 +136,6 @@ namespace tdc::lz77 {
             StatPhase::wrap("Init Hashes", [&] {
                 calculateHashes(std::min(lookahead, WINDOW_SIZE));
             });
-
-            #ifdef STATS_ENABLED
-            streamPos += lookahead;
-            #endif
 
             StatPhase::wrap("Factorize", [&] {
                 while (lookahead > 0) {
@@ -228,9 +224,6 @@ namespace tdc::lz77 {
                     if (stream.good()) { // relevant for last bytes. skip moving memory.
                         stream.read(&window[2 * WINDOW_SIZE - position], position);
                         readBytes = stream.gcount();
-                        #ifdef STATS_ENABLED
-                        streamPos += readBytes;
-                        #endif
                     }
                     //--------------------------------------
                     // |s----w2-------yyy|yyyyyyyyyyyyyyyyyy|    // y = new bytes, second window overwritten.

@@ -2,7 +2,6 @@
 #include "test/util.hpp"
 
 using namespace tdc;
-using coder = lzss::DidacticalCoder;
 
 template<class C>
 void decompress(const std::string compressedTest, std::string originalText, std::string options) {
@@ -24,7 +23,7 @@ void decompress(const std::string compressedTest, std::string originalText, std:
 
 TEST(lz77, SingleHashCompress) {
     const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
-    auto result = test::compress<lz77::LZ77SingleHashing<coder>>(input, "HASH_BITS=4,MAX_MATCH=5");
+    auto result = test::compress<lz77::LZ77SingleHashing<lzss::DidacticalCoder>>(input, "HASH_BITS=4,MAX_MATCH=5");
     ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
 }
 
