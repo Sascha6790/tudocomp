@@ -103,15 +103,15 @@ namespace tdc {
 
 
 
-            // template<typename T>
-            // static void col(T t, const int &width) {
-            //     std::cout << std::left << std::setw(width) << std::setfill(' ') << t;
-            // }
-
             template<typename T>
             static void col(T t, const int &width) {
-                std::cout << '\t' << t;
+                std::cout << std::left << std::setw(width) << std::setfill(' ') << t;
             }
+            //
+            // template<typename T>
+            // static void col(T t, const int &width) {
+            //     std::cout << '\t' << t;
+            // }
 
             static void row() {
                 std::cout << std::endl;
