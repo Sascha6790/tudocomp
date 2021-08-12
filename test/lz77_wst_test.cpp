@@ -8,14 +8,8 @@ using namespace tdc;
 
 using coder = lzss::DidacticalCoder;
 
-TEST(skeleton, LZ77Skeleton) {
-    const std::string input = "abcccccccde";
-    auto result = test::compress<lz77::LZ77Skeleton<lzss::DidacticalCoder>>(input);
-    std::cout << std::left << std::setw(22) << std::setfill(' ') << result.str;
-    ASSERT_EQ(result.str, "abc{2, 6}de");
-}
-
-TEST(st, banana$) {
+// TODO lz77::SuffixTree not working as expected !
+TEST(SuffixTree, banana$) {
     const std::string buffer = "banana$";
     // zero-based
     const int dsSize = 7;
@@ -25,28 +19,29 @@ TEST(st, banana$) {
     int *pLcp = &lcp[0];
     lz77::SuffixTree<uint> st(pLcp, pSa, buffer.c_str(), dsSize);
 
-    WeightedNode<uint> *node0 = st.getRoot()->childNodes['b'];
-
-    WeightedNode<uint> *node4a = st.getRoot()->childNodes['n'];
-    WeightedNode<uint> *node4 = node4a->childNodes['$'];
-    WeightedNode<uint> *node2 = node4->childNodes['n'];
-
-    WeightedNode<uint> *node5a = st.getRoot()->childNodes['a'];
-    WeightedNode<uint> *node5 = node5a->childNodes['$'];
-    WeightedNode<uint> *node3a = node5->childNodes['n'];
-    WeightedNode<uint> *node3 = node3a->childNodes['$'];
-    WeightedNode<uint> *node1 = node3a->childNodes['n'];
-
-    ASSERT_EQ(node0->nodeLabel, 0);
-    ASSERT_EQ(node4->nodeLabel, 4);
-    ASSERT_EQ(node2->nodeLabel, 2);
-    ASSERT_EQ(node5->nodeLabel, 5);
-    ASSERT_EQ(node3->nodeLabel, 3);
-    ASSERT_EQ(node1->nodeLabel, 1);
+    ASSERT_TRUE(1==2);
+    // WeightedNode<uint> *node0 = st.getRoot()->childNodes['b'];
+    //
+    // WeightedNode<uint> *node4a = st.getRoot()->childNodes['n'];
+    // WeightedNode<uint> *node4 = node4a->childNodes['$'];
+    // WeightedNode<uint> *node2 = node4->childNodes['n'];
+    //
+    // WeightedNode<uint> *node5a = st.getRoot()->childNodes['a'];
+    // WeightedNode<uint> *node5 = node5a->childNodes['$'];
+    // WeightedNode<uint> *node3a = node5->childNodes['n'];
+    // WeightedNode<uint> *node3 = node3a->childNodes['$'];
+    // WeightedNode<uint> *node1 = node3a->childNodes['n'];
+    //
+    // ASSERT_EQ(node0->nodeLabel, 0);
+    // ASSERT_EQ(node4->nodeLabel, 4);
+    // ASSERT_EQ(node2->nodeLabel, 2);
+    // ASSERT_EQ(node5->nodeLabel, 5);
+    // ASSERT_EQ(node3->nodeLabel, 3);
+    // ASSERT_EQ(node1->nodeLabel, 1);
 }
 
 
-TEST(cwst, FIXED_SIZE_TOO_BIG) {
+TEST(CappedWeightedSuffixTree, FIXED_SIZE_TOO_BIG) {
     // FIXED_SIZE * 2 > DS_SIZE
     const std::string buffer = "banana$";
     // zero-based
@@ -67,7 +62,7 @@ TEST(cwst, FIXED_SIZE_TOO_BIG) {
 }
 
 // WST Timing test. no Asserts here.
-TEST(wst, timeTest) {
+TEST(WeightedSuffixTree, timeTest) {
     // zero-based
     const int dsSize = 15;
     int sa[dsSize] = {14, 11, 8, 5, 2, 1, 12, 9, 6, 3, 13, 10, 7, 4, 0};
@@ -85,7 +80,7 @@ TEST(wst, timeTest) {
     std::cout << elapsed.count() / 100000 << '\n';
 }
 
-TEST(wst, cbabcabcabcabca) {
+TEST(WeightedSuffixTree, cbabcabcabcabca) {
     const std::string buffer = "cbabcabcabcabca";
     // zero-based
     const int dsSize = 15;
@@ -171,7 +166,7 @@ TEST(wst, cbabcabcabcabca) {
     ASSERT_EQ(node14->maxLabel, 14);
 }
 
-TEST(cwst, DIFFERENT_MIN_MAX_VALUES_IN_LEAF) {
+TEST(CappedWeightedSuffixTree, DIFFERENT_MIN_MAX_VALUES_IN_LEAF) {
     // LCP[4] = 5 > FIXED_SIZE = 4
     const std::string buffer = "cbabcabcabcabca";
     // zero-based

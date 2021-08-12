@@ -24,13 +24,13 @@ void decompress(const std::string compressedTest, std::string originalText, std:
     ASSERT_EQ(originalText, decompressed_text);
 }
 
-TEST(lz77, DoubleHashCompress) {
+TEST(LZ77DoubleHashing, FourBits) {
     const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
-    auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=4,MAX_MATCH=5");
+    auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=4");
     result.assert_decompress();
 }
 
-TEST(ExampleWikiText, MODE_1) {
+TEST(LZ77DoubleHashing, MODE_1) {
     const std::string input = "In Western astrology, astrological signs are the twelve 30° sectors of the ecliptic, starting at the vernal equinox (one of the intersections of the ecliptic with the celestial equator), also known as the First Point of Aries. The order of the astrological signs is Aries, Taurus, Gemini, Cancer, Leo, Virgo, Libra, Scorpio, Sagittarius, Capricorn, Aquarius and Pisces.\n"
                               "The concept of the zodiac originated in Babylonian astrology, and was later influenced by Hellenistic culture. According to astrology, celestial phenomena relate to human activity on the principle of \"as above, so below\", so that the signs are held to represent characteristic modes of expression.\n"
                               "The twelve sector division of the ecliptic constitutes astrology's primary frame of reference when considering the positions of celestial bodies, from a geocentric point of view, so that we may find, for instance, the Sun in 23° \"Aries\" (23° longitude), the Moon in 7° \"Scorpio\" (217° longitude), or Jupiter in 29° \"Pisces\" (359° longitude). Beyond the celestial bodies, other astrological points that are dependent on geographical location and time (namely, the Ascendant, the Midheaven, the Vertex and the houses' cusps) are also referenced within this ecliptic coordinate system.\n"
@@ -46,7 +46,7 @@ TEST(ExampleWikiText, MODE_1) {
     auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=15");
     decompress<lz77::LZ77DoubleHashing<lzss::StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(result.str, input, "");
 }
-TEST(ExampleWikiText, MODE_2) {
+TEST(LZ77DoubleHashing, MODE_2) {
     const std::string input = "In Western astrology, astrological signs are the twelve 30° sectors of the ecliptic, starting at the vernal equinox (one of the intersections of the ecliptic with the celestial equator), also known as the First Point of Aries. The order of the astrological signs is Aries, Taurus, Gemini, Cancer, Leo, Virgo, Libra, Scorpio, Sagittarius, Capricorn, Aquarius and Pisces.\n"
                               "The concept of the zodiac originated in Babylonian astrology, and was later influenced by Hellenistic culture. According to astrology, celestial phenomena relate to human activity on the principle of \"as above, so below\", so that the signs are held to represent characteristic modes of expression.\n"
                               "The twelve sector division of the ecliptic constitutes astrology's primary frame of reference when considering the positions of celestial bodies, from a geocentric point of view, so that we may find, for instance, the Sun in 23° \"Aries\" (23° longitude), the Moon in 7° \"Scorpio\" (217° longitude), or Jupiter in 29° \"Pisces\" (359° longitude). Beyond the celestial bodies, other astrological points that are dependent on geographical location and time (namely, the Ascendant, the Midheaven, the Vertex and the houses' cusps) are also referenced within this ecliptic coordinate system.\n"
