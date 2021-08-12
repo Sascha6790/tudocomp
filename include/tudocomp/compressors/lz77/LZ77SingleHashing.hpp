@@ -105,7 +105,7 @@ namespace tdc::lz77 {
             coder.factor_length_range(Range(MIN_MATCH, MAX_MATCH));
             coder.encode_header();
             tdc::io::InputStream stream = input.as_stream();
-            uint strstart = 0;
+            uint position = 0;
 
             // store best results
             uint maxMatchCount = 0;
@@ -122,16 +122,16 @@ namespace tdc::lz77 {
                 while (lookahead > MIN_LOOKAHEAD || (isLastBlock && lookahead > 0)) {
                     maxMatchPos = 0;
 
-                    f1(strstart);
-                    prev[strstart & WMASK] = head[hashHead];
-                    head[hashHead] = strstart; // updates h1
+                    f1(position);
+                    prev[position & WMASK] = head[hashHead];
+                    head[hashHead] = position; // updates h1
 
-                    if (hashHead != 0 && canReadMaximumLength(strstart)) {
+                    if (hashHead != 0 && canReadMaximumLength(position)) {
                         // store results for current iteraton
                         uint currentMatchPos;
                         uint currentMatchCount = 0;
                         // init iteration variables
-                        uint currentHead = strstart;
+                        uint currentHead = position;
                         uint currentStrPos;
                         uint oldHead = 2 * WINDOW_SIZE;
 
@@ -139,7 +139,7 @@ namespace tdc::lz77 {
                         while (oldHead > currentHead && prev[currentHead & WMASK] != 0 &&
                                currentMatchCount != MAX_MATCH && lookahead > 0) {
                             // init
-                            currentStrPos = strstart;
+                            currentStrPos = position;
                             currentMatchCount = 0;
                             currentMatchPos = prev[currentHead & WMASK];
 
@@ -166,24 +166,24 @@ namespace tdc::lz77 {
                         }
                     }
                     if (!isLiteral(maxMatchCount)) {
-                        addFactor(strstart - maxMatchPos, maxMatchCount, coder);
+                        addFactor(position - maxMatchPos, maxMatchCount, coder);
                         lookahead -= maxMatchCount;
                     } else {
                         if (maxMatchCount == 0) {
                             maxMatchCount = 1; // add at least one char as Literal !
                         }
-                        addLiteralWord(&window[strstart], maxMatchCount, coder);
+                        addLiteralWord(&window[position], maxMatchCount, coder);
                         lookahead -= maxMatchCount;
                     }
-                    --maxMatchCount; // don't parse the current strstart position, skip it. only parse the rest of the matching.
-                    ++strstart;
+                    --maxMatchCount; // don't parse the current position, skip it. only parse the rest of the matching.
+                    ++position;
 
                     // calculate skipped head and prev values caused by a matched string.
                     while (maxMatchCount != 0) {
-                        f1(strstart);
-                        prev[strstart & WMASK] = head[hashHead];
-                        head[hashHead] = strstart; // updates h1
-                        ++strstart;
+                        f1(position);
+                        prev[position & WMASK] = head[hashHead];
+                        head[hashHead] = position; // updates h1
+                        ++position;
                         --maxMatchCount;
                     }
                     assert(maxMatchCount == 0);
@@ -195,24 +195,24 @@ namespace tdc::lz77 {
                     // copy everything, that is not yet processed to window[0] !
                     // PRO: fast, no need to adjust head and prev tables.
                     // CON: misses a few factors.
-                    memcpy(&window[0], &window[strstart], 2 * WINDOW_SIZE - strstart);
+                    memcpy(&window[0], &window[position], 2 * WINDOW_SIZE - position);
 
                     // replenish window
                     if (stream.good()) { // relevant for last bytes. skip moving memory.
-                        stream.read(&window[2 * WINDOW_SIZE - strstart], strstart);
+                        stream.read(&window[2 * WINDOW_SIZE - position], position);
                         readBytes = stream.gcount();
                     }
 
                     // reset tables !
                     memset(head, 0, sizeof(unsigned) * HASH_TABLE_SIZE);
                     memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
-                    strstart = 0;
+                    position = 0;
                 } else {
                     // Strategy 2
                     // move exactly WINDOW_SIZE bytes
                     // FROM:
                     //--------------------------------------
-                    // |-----------------|+++s++++++++++++++| // s = strstart
+                    // |-----------------|+++s++++++++++++++| // s = position
                     //--------------------------------------
                     // TO:
                     //--------------------------------------
@@ -221,7 +221,7 @@ namespace tdc::lz77 {
                     // Preserve bytes before s and update hashtables accorindly
                     // PRO: can use matches that got calculated before.
                     // CON: slower than just trashing head and prev tables.
-                    if (strstart >= WINDOW_SIZE) {
+                    if (position >= WINDOW_SIZE) {
                         memcpy(&window[0], &window[WINDOW_SIZE], WINDOW_SIZE);
 
                         if (stream.good()) { // relevant for last bytes. skip moving memory.
@@ -238,7 +238,7 @@ namespace tdc::lz77 {
                             prev[h] = prev[h] > WINDOW_SIZE ? prev[h] - WINDOW_SIZE : 0;
                         }
 
-                        strstart -= WINDOW_SIZE;
+                        position -= WINDOW_SIZE;
                     } else {
                         assert(lookahead == 0); // exit criteria, isLastBlock will be set.
                     }
@@ -266,8 +266,8 @@ namespace tdc::lz77 {
 
 
         [[gnu::always_inline]]
-        inline bool canReadMaximumLength(ulong strstart) const {
-            return strstart <= 2 * WINDOW_SIZE - MIN_LOOKAHEAD;
+        inline bool canReadMaximumLength(ulong position) const {
+            return position <= 2 * WINDOW_SIZE - MIN_LOOKAHEAD;
         }
 
         inline uint f2(uint pos) {

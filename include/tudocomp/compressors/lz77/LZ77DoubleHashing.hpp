@@ -43,6 +43,8 @@ namespace tdc::lz77 {
         const uint MIN_LOOKAHEAD;
         const uint MAX_DIST;
 
+        int COMPRESSION_MODE; //might change, but it's unlikely, only for edge-cases.
+
         char *window;
 
         uint h1;
@@ -57,7 +59,7 @@ namespace tdc::lz77 {
         #ifdef STATS_ENABLED
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
-
+        std::streampos streampos = 0;
         #endif
 
     public:
@@ -66,7 +68,7 @@ namespace tdc::lz77 {
             m.param("coder", "The output encoder.").strategy<lz77_coder>(TypeDesc("lzss_coder"));
             m.param("HASH_BITS", "dictionary of size 2^HASH_BITS").primitive(3);
             m.param("MIN_MATCH", "minimum factor size").primitive(3);
-            m.param("MAX_MATCH", "maximum factor size").primitive(258);
+            m.param("COMPRESSION_MODE", "maximum factor size").primitive(1);
             m.inherit_tag<lz77_coder>(tags::lossy);
             return m;
         }
@@ -82,6 +84,8 @@ namespace tdc::lz77 {
                                                         HASH_MASK(HASH_TABLE_SIZE - 1),
                                                         WMASK(WINDOW_SIZE - 1),
                                                         MIN_LOOKAHEAD(MAX_MATCH + MIN_MATCH + 1),
+                                                        COMPRESSION_MODE(
+                                                                this->config().param("COMPRESSION_MODE").as_uint()),
                                                         MAX_DIST(WINDOW_SIZE - MIN_LOOKAHEAD) {
             #ifdef STATS_ENABLED
             fac = &factors;
@@ -97,6 +101,12 @@ namespace tdc::lz77 {
             // zero mem
             memset(head, 0, sizeof(unsigned) * HASH_TABLE_SIZE);
             memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
+
+            if (COMPRESSION_MODE != 1) {
+                if (WINDOW_SIZE - MIN_LOOKAHEAD <= MIN_LOOKAHEAD) {
+                    COMPRESSION_MODE = 1; //default to COMPRESSION_MODE 1 if COMPRESSION_MODE 2 is not available.
+                }
+            }
         }
 
         inline LZ77DoubleHashing() = delete;
@@ -213,29 +223,38 @@ namespace tdc::lz77 {
                             --maxMatchCount;
                         }
                     }
-                    //--------------------------------------
-                    // |-------w1--------|---s----w2-------| // s = position
-                    //--------------------------------------
-                    memcpy(&window[0], &window[position], 2 * WINDOW_SIZE - position);
-                    //--------------------------------------
-                    // |s----w2-------xxx|---s----w2-------|    // x = old bytes which weren't moved. second window untouched.
-                    //--------------------------------------
+
                     uint readBytes = 0;
-                    if (stream.good()) { // relevant for last bytes. skip moving memory.
-                        stream.read(&window[2 * WINDOW_SIZE - position], position);
-                        readBytes = stream.gcount();
+                    if (COMPRESSION_MODE == 1) {
+                        // Strategy 1
+                        // copy everything, that is not yet processed to window[0] !
+                        // PRO: fast, no need to adjust head and prev tables.
+                        // CON: misses a few factors.
+                        memcpy(&window[0], &window[position], 2 * WINDOW_SIZE - position);
+
+                        // replenish window
+                        if (stream.good()) { // relevant for last bytes. skip moving memory.
+                            stream.read(&window[2 * WINDOW_SIZE - position], position);
+                            readBytes = stream.gcount();
+                        }
+                        // reset tables !
+                        memset(head, 0, sizeof(unsigned) * HASH_TABLE_SIZE);
+                        memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
+                        position = 0;
+                        calculateHashes(std::min(lookahead, WINDOW_SIZE));
                     }
-                    //--------------------------------------
-                    // |s----w2-------yyy|yyyyyyyyyyyyyyyyyy|    // y = new bytes, second window overwritten.
-                    //--------------------------------------
 
                     lookahead += readBytes;
-                    reconstructTables(position, std::min(lookahead, WINDOW_SIZE));
-                    position = 0;
+
+
 
                     isLastBlock = !stream.good() && lookahead <= MIN_LOOKAHEAD;
                 }
             });
+
+            #ifdef STATS_ENABLED
+            LZ77Helper::printStats(input, root, streampos, factors, WINDOW_SIZE);
+            #endif
 
             StatPhase::wrap("Factorize Cleanup", [&] {
                 delete[] window;
@@ -262,7 +281,7 @@ namespace tdc::lz77 {
                 prev[h] = prev[h] > position ? prev[h] - position : 0;
             }
 
-            calculateHashes(bytesInWindow);
+
         }
 
         [[gnu::always_inline]]
@@ -366,10 +385,11 @@ namespace tdc::lz77 {
         }
 
         [[gnu::always_inline]]
-        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) const {
+        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
             cod.encode_factor(lzss::Factor(0, offset, length));
-            #ifdef STORE_VECTOR_ENABLED
+            #ifdef STATS_ENABLED
             fac->emplace_back(0, offset, length);
+            streampos += length;
             #endif
         }
 
@@ -388,8 +408,11 @@ namespace tdc::lz77 {
 
         [[gnu::always_inline]]
         inline void
-        addLiteral(uliteral_t literal, auto &coder) const {
+        addLiteral(uliteral_t literal, auto &coder) {
             coder.encode_literal(literal);
+            #ifdef STATS_ENABLED
+            streampos += 1;
+            #endif
         }
 
         [[nodiscard]] inline std::unique_ptr<Decompressor> decompressor() const override {
