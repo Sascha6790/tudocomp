@@ -242,6 +242,40 @@ namespace tdc::lz77 {
                         memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
                         position = 0;
                         calculateHashes(std::min(lookahead, WINDOW_SIZE));
+                    }else {
+                        // Strategy 2
+                        // move exactly WINDOW_SIZE bytes
+                        // FROM:
+                        //--------------------------------------
+                        // |-----------------|+++s++++++++++++++| // s = position
+                        //--------------------------------------
+                        // TO:
+                        //--------------------------------------
+                        // |+++s+++++++++++++|xxxxxxxxxxxxxxxxxx|    // x has to be replaced by new bytes.
+                        //--------------------------------------
+                        // Preserve bytes before s and update hashtables accorindly
+                        // PRO: can use matches that got calculated before.
+                        // CON: slower than just trashing head and prev tables.
+                        if (position >= WINDOW_SIZE) {
+                            memcpy(&window[0], &window[WINDOW_SIZE], WINDOW_SIZE);
+
+                            if (stream.good()) { // relevant for last bytes. skip moving memory.
+                                stream.read(&window[WINDOW_SIZE], WINDOW_SIZE);
+                                readBytes = stream.gcount();
+                            }
+
+                            uint h = HASH_TABLE_SIZE;
+                            while (h-- > 0) {
+                                head[h] = head[h] > WINDOW_SIZE ? head[h] - WINDOW_SIZE : 0;
+                            }
+                            h = WINDOW_SIZE;
+                            while (h-- > 0) {
+                                prev[h] = prev[h] > WINDOW_SIZE ? prev[h] - WINDOW_SIZE : 0;
+                            }
+
+                            position -= WINDOW_SIZE;
+                            calculateHashes(std::min(lookahead, WINDOW_SIZE));
+                        }
                     }
 
                     lookahead += readBytes;

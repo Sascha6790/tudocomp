@@ -46,6 +46,7 @@ namespace tdc::lz77 {
         #ifdef STATS_ENABLED
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
+        std::streampos streampos = 0;
         #endif
 
     public:
@@ -234,6 +235,10 @@ namespace tdc::lz77 {
                 }
             });
 
+            #ifdef STATS_ENABLED
+            LZ77Helper::printStats(input, root, streampos, factors, WINDOW_SIZE);
+            #endif
+
             delete[] window;
             delete[] suffixArray;
             delete[] inverseSuffixArray;
@@ -260,13 +265,14 @@ namespace tdc::lz77 {
 
 
         [[gnu::always_inline]]
-        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) const {
+        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
             if (offset > DS_SIZE) {
                 std::cout << "check";
             }
             cod.encode_factor(lzss::Factor(0, offset, length));
-            #ifdef STORE_VECTOR_ENABLED
+            #ifdef STATS_ENABLED
             fac->emplace_back(0, offset, length);
+            streampos+=length;
             #endif
         }
 
@@ -285,8 +291,9 @@ namespace tdc::lz77 {
 
         [[gnu::always_inline]]
         inline void
-        addLiteral(uliteral_t literal, auto &coder) const {
+        addLiteral(uliteral_t literal, auto &coder) {
             coder.encode_literal(literal);
+            streampos+=1;
         }
 
         [[gnu::always_inline]]

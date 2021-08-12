@@ -300,7 +300,7 @@ namespace tdc::lz77 {
         inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
             cod.encode_factor(lzss::Factor(0, offset, length));
             streamPos += length;
-            #ifdef STORE_VECTOR_ENABLED
+            #ifdef STATS_ENABLED
             fac->emplace_back(0, offset, length);
             #endif
         }
