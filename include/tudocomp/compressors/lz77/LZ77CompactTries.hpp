@@ -301,7 +301,7 @@ namespace tdc::lz77 {
             cod.encode_factor(lzss::Factor(0, offset, length));
             streamPos += length;
             #ifdef STATS_ENABLED
-            fac->emplace_back(0, offset, length);
+            fac->emplace_back(streampos, offset, length);
             #endif
         }
 

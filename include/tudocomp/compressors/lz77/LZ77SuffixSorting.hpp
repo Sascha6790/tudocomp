@@ -266,12 +266,9 @@ namespace tdc::lz77 {
 
         [[gnu::always_inline]]
         inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
-            if (offset > DS_SIZE) {
-                std::cout << "check";
-            }
             cod.encode_factor(lzss::Factor(0, offset, length));
             #ifdef STATS_ENABLED
-            fac->emplace_back(0, offset, length);
+            fac->emplace_back(streampos, offset, length);
             streampos+=length;
             #endif
         }
@@ -293,7 +290,9 @@ namespace tdc::lz77 {
         inline void
         addLiteral(uliteral_t literal, auto &coder) {
             coder.encode_literal(literal);
+            #ifdef STATS_ENABLED
             streampos+=1;
+            #endif
         }
 
         [[gnu::always_inline]]

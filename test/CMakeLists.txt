@@ -71,6 +71,7 @@ run_test(lz77_matching_statistics_test  DEPS ${BASIC_DEPS})
 run_test(lz77_file_test_suffix_sorting  DEPS ${BASIC_DEPS})
 run_test(lz77_file_test_single_hashing  DEPS ${BASIC_DEPS})
 run_test(lz77_file_test_double_hashing  DEPS ${BASIC_DEPS})
+run_test(lz77_final_tests  DEPS ${BASIC_DEPS})
 
 
 set(SANDBOX_CPP ${CMAKE_CURRENT_SOURCE_DIR}/sandbox_tests.cpp)

@@ -1,5 +1,6 @@
 #include <tudocomp/compressors/lz77/LZ77StreamingCoder.hpp>
 #include <tudocomp/compressors/lz77/LZ77SingleHashing.hpp>
+#include <tudocomp/compressors/lz77/LZ77DoubleHashing.hpp>
 #include <tudocomp/compressors/lzss/StreamingCoder.hpp>
 #include "test/util.hpp"
 
