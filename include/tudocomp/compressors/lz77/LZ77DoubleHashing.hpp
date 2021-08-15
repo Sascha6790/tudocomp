@@ -91,6 +91,11 @@ namespace tdc::lz77 {
             fac = &factors;
             #endif
 
+            // TODO write test.
+            if(HASH_BITS > 16) {
+                throw new std::invalid_argument("HASH_BITS too big. Maximum allowed value is 16.");
+            }
+
             assert(MIN_LOOKAHEAD < WINDOW_SIZE);
             window = new char[2 * WINDOW_SIZE];
             head = new unsigned[HASH_TABLE_SIZE];
@@ -218,9 +223,8 @@ namespace tdc::lz77 {
                         // skip first character because we already calculated that one.
                         ++position;
                         --maxMatchCount;
-                        while (maxMatchCount != 0) {
+                        while (maxMatchCount-- != 0) {
                             nextHash(position++);
-                            --maxMatchCount;
                         }
                     }
 
@@ -237,13 +241,15 @@ namespace tdc::lz77 {
                             stream.read(&window[2 * WINDOW_SIZE - position], position);
                             readBytes = stream.gcount();
                         }
+                        lookahead += readBytes;
                         // reset tables !
                         memset(head, 0, sizeof(unsigned) * HASH_TABLE_SIZE);
                         memset(prev, 0, sizeof(unsigned) * WINDOW_SIZE);
-                        position = 0;
                         calculateHashes(std::min(lookahead, WINDOW_SIZE));
+                        position = 0;
                     }else {
                         // Strategy 2
+                        // move exactly WINDOW_SIZE bytes
                         // move exactly WINDOW_SIZE bytes
                         // FROM:
                         //--------------------------------------
@@ -273,14 +279,11 @@ namespace tdc::lz77 {
                                 prev[h] = prev[h] > WINDOW_SIZE ? prev[h] - WINDOW_SIZE : 0;
                             }
 
-                            position -= WINDOW_SIZE;
+                            lookahead += readBytes;
                             calculateHashes(std::min(lookahead, WINDOW_SIZE));
+                            position -= WINDOW_SIZE;
                         }
                     }
-
-                    lookahead += readBytes;
-
-
 
                     isLastBlock = !stream.good() && lookahead <= MIN_LOOKAHEAD;
                 }
@@ -322,7 +325,7 @@ namespace tdc::lz77 {
         [[gnu::always_inline]]
         inline void nextHash(uint position) {
             calculateH1(position);
-            calculateH2Ex(position);
+            calculateH2Ex(position + MIN_MATCH);
             uint base = phash[h1];
             prev[position & WMASK] = head[base + h2] & WMASK;
             head[base + h2] = position; // updates h1

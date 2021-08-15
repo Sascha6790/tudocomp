@@ -54,7 +54,7 @@ void decompressFile(const char *fileIn, const char *fileOut, std::string options
 
 std::string getOptions(uint bits, uint mode) {
     std::ostringstream options;
-    options << "HASH_BITS=" << bits << ", COMPRESSION_MODE=" << mode;
+    options << "HASH_BITS=" << bits;
     return std::string(options.str());
 }
 
@@ -67,12 +67,40 @@ std::string getInput(std::string filename) {
 std::string getOutput(std::string filename, uint bits, uint mode, std::string extension) {
     std::ostringstream fileOut;
     fileOut << OUTPUT_PATH << filename << "." << bits << "bit" << "." << "mode " << mode <<
-    "." << extension;
+            "." << extension;
     return std::string(fileOut.str());
 }
 
 
-TEST(wiki_all_vital_1Mb_binary_compress, MODE_1) {
+TEST(DoulbeHashing, MODE_2_Binary) {
+    uint bits = 15;
+    uint mode = 2;
+    std::string filename = "wiki_all_vital.txt.1MB";
+
+    compressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    BinaryCoder,
+                    BinaryCoder,
+                    BinaryCoder>>>(getInput(filename).c_str(),
+                                   getOutput(filename, bits, mode, "binary.compressed").c_str(),
+                                   getOptions(bits, mode));
+}
+
+TEST(DoulbeHashing, MODE_1_Binary) {
+    uint bits = 15;
+    uint mode = 1;
+    std::string filename = "wiki_all_vital.txt.1MB";
+
+    compressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    BinaryCoder,
+                    BinaryCoder,
+                    BinaryCoder>>>(getInput(filename).c_str(),
+                                   getOutput(filename, bits, mode, "binary.compressed").c_str(),
+                                   getOptions(bits, mode));
+}
+
+TEST(DoulbeHashing, MODE_1) {
     uint bits = 15;
     uint mode = 1;
     std::string filename = "wiki_all_vital.txt.1MB";
@@ -86,7 +114,7 @@ TEST(wiki_all_vital_1Mb_binary_compress, MODE_1) {
                                        getOptions(bits, mode));
 }
 
-TEST(wiki_all_vital_1Mb_binary_compress, MODE_2) {
+TEST(DoulbeHashing, MODE_2) {
     uint bits = 15;
     uint mode = 2;
     std::string filename = "wiki_all_vital.txt.1MB";
@@ -101,7 +129,7 @@ TEST(wiki_all_vital_1Mb_binary_compress, MODE_2) {
 }
 
 
-TEST(wiki_all_vital_1Mb_binary_decompress, MODE_1) {
+TEST(DoulbeHashing, MODE_1_DECOMPRESS) {
     uint bits = 15;
     uint mode = 1;
     std::string filename = "wiki_all_vital.txt.1MB";
@@ -115,7 +143,7 @@ TEST(wiki_all_vital_1Mb_binary_decompress, MODE_1) {
 }
 
 
-TEST(wiki_all_vital_1Mb_binary_decompress, MODE_2) {
+TEST(DoulbeHashing, MODE_2_DECOMPRESS) {
     uint bits = 15;
     uint mode = 2;
     std::string filename = "wiki_all_vital.txt.1MB";

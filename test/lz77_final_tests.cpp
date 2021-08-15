@@ -105,6 +105,33 @@ TEST(LZ77SingleHashing, allFiles) {
 
 TEST(LZ77MatchingStatistics, allaFiles) {
     uint bits = 15;
+    uint mode = 2;
+    std::string filename = "wiki_all_vital.txt.1MB";
+    std::string options = getOptions(bits, mode);
+    compressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    EliasDeltaCoder,
+                    EliasDeltaCoder,
+                    EliasDeltaCoder>>>(getInput(filename).c_str(),
+                                       getOutput(filename, bits, mode, "elias.compressed").c_str(),
+                                       options);
+}
+
+TEST(LZ77MatchingStatistics, allaFiles22) {
+    uint bits = 15;
+    uint mode = 2;
+    std::string filename = "wiki_all_vital.txt.1MB";
+    compressFile<lz77::LZ77SingleHashing<
+            lz77::LZ77StreamingCoder<
+                    EliasDeltaCoder,
+                    EliasDeltaCoder,
+                    EliasDeltaCoder>>>(getInput(filename).c_str(),
+                                       getOutput(filename, bits, mode, "elias.compressed").c_str(),
+                                       getOptions(bits, mode));
+}
+
+TEST(LZ77MatchingStatistics, allaFiles223) {
+    uint bits = 15;
     uint mode = 0;
     std::string filename = "wiki_all_vital.txt.1MB";
     compressFile<lz77::LZ77DoubleHashing<
@@ -112,6 +139,19 @@ TEST(LZ77MatchingStatistics, allaFiles) {
                     EliasDeltaCoder,
                     EliasDeltaCoder,
                     EliasDeltaCoder>>>(getInput(filename).c_str(),
+                                       getOutput(filename, bits, mode, "elias.compressed").c_str(),
+                                       getOptions(bits, mode));
+}
+
+TEST(LZ77MatchingStatistics, ascii) {
+    uint bits = 15;
+    uint mode = 0;
+    std::string filename = "wiki_all_vital.txt.1MB";
+    compressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    ASCIICoder,
+                    ASCIICoder,
+                    ASCIICoder>>>(getInput(filename).c_str(),
                                        getOutput(filename, bits, mode, "elias.compressed").c_str(),
                                        getOptions(bits, mode));
 }

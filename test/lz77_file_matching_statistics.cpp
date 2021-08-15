@@ -1,4 +1,5 @@
 #include <tudocomp/compressors/lz77/LZ77StreamingCoder.hpp>
+#include <tudocomp/compressors/lz77/LZ77MatchingStatistics.hpp>
 #include <tudocomp/compressors/lz77/LZ77SingleHashing.hpp>
 #include <tudocomp/compressors/lzss/StreamingCoder.hpp>
 #include "test/util.hpp"
@@ -51,9 +52,9 @@ void decompressFile(const char *fileIn, const char *fileOut, std::string options
     decompressor->decompress(text_in, decoded_out);
 }
 
-std::string getOptions(uint bits, uint mode) {
+std::string getOptions(uint bits) {
     std::ostringstream options;
-    options << "HASH_BITS=" << bits << ", COMPRESSION_MODE=" << mode;
+    options << "HASH_BITS=" << bits;
     return std::string(options.str());
 }
 
@@ -62,18 +63,43 @@ std::string getInput(std::string filename) {
     fileIn << INTPUT_PATH << filename;
     return std::string(fileIn.str());
 }
-
-std::string getOutput(std::string filename, uint bits, uint mode, std::string extension) {
+std::string getOutput(std::string filename, uint bits, std::string extension) {
     std::ostringstream fileOut;
-    fileOut << OUTPUT_PATH << filename << "." << bits << "bit" << "." << "mode " << mode <<
-    "." << extension;
+    fileOut << OUTPUT_PATH << filename << "." << bits << "bit" << "." << extension;
     return std::string(fileOut.str());
 }
 
 
-TEST(SingleHashing, MODE_1) {
+TEST(LZ77SuffixSorting, wiki_all_vital_1Mb_binary_compress)
+{
     uint bits = 15;
-    uint mode = 1;
+    std::string filename = "wiki_all_vital.txt.1MB";
+
+    compressFile<lz77::LZ77MatchingStatistics<
+            lz77::LZ77StreamingCoder<
+                    ASCIICoder,
+                    ASCIICoder,
+                    ASCIICoder>>>(getInput(filename).c_str(),
+                                   getOutput(filename, bits, "ascii.compressed").c_str(),
+                                   getOptions(bits));
+}
+TEST(LZ77SuffixSorting, elias)
+{
+    uint bits = 15;
+    std::string filename = "wiki_all_vital.txt.1MB";
+
+    compressFile<lz77::LZ77MatchingStatistics<
+            lz77::LZ77StreamingCoder<
+                    EliasDeltaCoder,
+                    EliasDeltaCoder,
+                    EliasDeltaCoder>>>(getInput(filename).c_str(),
+                                   getOutput(filename, bits, "elias.compressed").c_str(),
+                                   getOptions(bits));
+}
+
+TEST(LZ77SuffixSorting, asdasd)
+{
+    uint bits = 15;
     std::string filename = "wiki_all_vital.txt.1MB";
 
     compressFile<lz77::LZ77SingleHashing<
@@ -81,13 +107,13 @@ TEST(SingleHashing, MODE_1) {
                     EliasDeltaCoder,
                     EliasDeltaCoder,
                     EliasDeltaCoder>>>(getInput(filename).c_str(),
-                                       getOutput(filename, bits, mode, "elias.compressed").c_str(),
-                                       getOptions(bits, mode));
+                                   getOutput(filename, bits, "elias.compressed").c_str(),
+                                   getOptions(bits));
 }
 
-TEST(SingleHashing, MODE_2) {
+TEST(LZ77SuffixSorting, asdasd2)
+{
     uint bits = 15;
-    uint mode = 2;
     std::string filename = "wiki_all_vital.txt.1MB";
 
     compressFile<lz77::LZ77SingleHashing<
@@ -95,34 +121,6 @@ TEST(SingleHashing, MODE_2) {
                     EliasDeltaCoder,
                     EliasDeltaCoder,
                     EliasDeltaCoder>>>(getInput(filename).c_str(),
-                                       getOutput(filename, bits, mode, "elias.compressed").c_str(),
-                                       getOptions(bits, mode));
-}
-
-
-TEST(SingleHashing, MODE_1_DECOMPRESS) {
-    uint bits = 15;
-    uint mode = 1;
-    std::string filename = "wiki_all_vital.txt.1MB";
-    decompressFile<lz77::LZ77SingleHashing<
-            lz77::LZ77StreamingCoder<
-                    EliasDeltaCoder,
-                    EliasDeltaCoder,
-                    EliasDeltaCoder>>>(getOutput(filename, bits, mode, "elias.compressed").c_str(),
-                                       getOutput(filename, bits, mode, "elias.decompressed").c_str(),
-                                       getOptions(bits, mode));
-}
-
-
-TEST(SingleHashing, MODE_2_DECOMPRESS) {
-    uint bits = 15;
-    uint mode = 2;
-    std::string filename = "wiki_all_vital.txt.1MB";
-    decompressFile<lz77::LZ77SingleHashing<
-            lz77::LZ77StreamingCoder<
-                    EliasDeltaCoder,
-                    EliasDeltaCoder,
-                    EliasDeltaCoder>>>(getOutput(filename, bits, mode, "elias.compressed").c_str(),
-                                       getOutput(filename, bits, mode, "elias.decompressed").c_str(),
-                                       getOptions(bits, mode));
+                                   getOutput(filename, bits, "elias.compressed").c_str(),
+                                   "COMPRESSION_MODE=2, HASH_BITS=15");
 }

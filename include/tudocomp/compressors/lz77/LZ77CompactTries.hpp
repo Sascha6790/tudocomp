@@ -40,8 +40,8 @@ namespace tdc::lz77 {
         const int dsSize, bufSize;
         const int MIN_MATCH = 3;
 
-        std::streampos streamPos = 0;
         #ifdef STATS_ENABLED
+        std::streampos streamPos = 0;
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
         #endif
@@ -293,15 +293,17 @@ namespace tdc::lz77 {
         [[gnu::always_inline]]
         inline void addLiteral(uliteral_t literal, auto &cod) {
             cod.encode_literal(literal);
+            #ifdef STATS_ENABLED
             streamPos += 1;
+            #endif
         }
 
         [[gnu::always_inline]]
         inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
             cod.encode_factor(lzss::Factor(0, offset, length));
-            streamPos += length;
             #ifdef STATS_ENABLED
-            fac->emplace_back(streampos, offset, length);
+            streamPos += length;
+            fac->emplace_back(streamPos, offset, length);
             #endif
         }
 

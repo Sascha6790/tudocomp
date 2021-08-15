@@ -239,8 +239,6 @@ namespace tdc::lz77 {
                         }
 
                         position -= WINDOW_SIZE;
-                    } else {
-                        assert(lookahead == 0); // exit criteria, isLastBlock will be set.
                     }
                 }
 

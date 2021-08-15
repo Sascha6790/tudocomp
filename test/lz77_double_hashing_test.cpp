@@ -25,28 +25,22 @@ void decompress(const std::string compressedTest, std::string originalText, std:
 }
 
 
-TEST(LZ77DoubleHashing, FourBits2) {
+TEST(LZ77DoubleHashing, Bit8) {
+    const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
+    auto result = test::compress<lz77::LZ77DoubleHashing<lzss::DidacticalCoder>>(input, "HASH_BITS=8");
+    ASSERT_EQ(result.str, "cbabc{3, 12}{16, 7}{8, 8}abca{3, 5}b{4, 3}{3, 3}");
+}
+
+TEST(LZ77DoubleHashing, Bit4) {
     const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
     auto result = test::compress<lz77::LZ77DoubleHashing<lzss::DidacticalCoder>>(input, "HASH_BITS=4");
     ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
 }
 
-TEST(LZ77DoubleHashing, FourBits2Streaming) {
-    const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
-    auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=4");
-    ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
-}
-
-TEST(LZ77DoubleHashing, FourBits_Mode2) {
+TEST(LZ77DoubleHashing, Bit4_Mode2) {
     const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
     auto result = test::compress<lz77::LZ77DoubleHashing<lzss::DidacticalCoder>>(input, "HASH_BITS=4,COMPRESSION_MODE=2");
     ASSERT_EQ(result.str, "cbabc{3, 5}{3, 5}bc{16, 5}bccbabc{3, 5}{3, 5}bcbabc{3, 3}");
-}
-
-TEST(LZ77DoubleHashing, FourBits) {
-    const std::string input = "cbabcabcabcabcabcbabcabccbabcabcabcabcabcbabcabc";
-    auto result = test::compress<lz77::LZ77DoubleHashing<lz77::LZ77StreamingCoder<ASCIICoder, ASCIICoder, ASCIICoder>>>(input, "HASH_BITS=4");
-    result.assert_decompress();
 }
 
 TEST(LZ77DoubleHashing, MODE_1) {
