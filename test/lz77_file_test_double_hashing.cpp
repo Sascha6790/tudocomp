@@ -103,7 +103,7 @@ TEST(DoulbeHashing, MODE_1_Binary) {
 TEST(DoulbeHashing, MODE_1) {
     uint bits = 15;
     uint mode = 1;
-    std::string filename = "wiki_all_vital.txt.100MB";
+    std::string filename = "wiki_all_vital.txt.1MB";
 
     compressFile<lz77::LZ77DoubleHashing<
             lz77::LZ77StreamingCoder<
