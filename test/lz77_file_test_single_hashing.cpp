@@ -88,7 +88,7 @@ TEST(SingleHashing, MODE_1) {
 TEST(SingleHashing, MODE_2) {
     uint bits = 15;
     uint mode = 2;
-    std::string filename = "wiki_all_vital.txt.1MB";
+    std::string filename = "wiki_all_vital.txt.100MB";
 
     compressFile<lz77::LZ77SingleHashing<
             lz77::LZ77StreamingCoder<
