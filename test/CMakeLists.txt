@@ -72,6 +72,8 @@ run_test(lz77_file_test_suffix_sorting  DEPS ${BASIC_DEPS})
 run_test(lz77_file_test_single_hashing  DEPS ${BASIC_DEPS})
 run_test(lz77_file_test_double_hashing  DEPS ${BASIC_DEPS})
 run_test(lz77_final_tests  DEPS ${BASIC_DEPS})
+run_test(lz77_final_time_tests  DEPS ${BASIC_DEPS})
+run_test(lz77_final_memory_tests  DEPS ${BASIC_DEPS})
 run_test(lz77_file_matching_statistics  DEPS ${BASIC_DEPS})
 
 

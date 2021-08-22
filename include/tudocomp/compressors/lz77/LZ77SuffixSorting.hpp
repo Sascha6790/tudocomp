@@ -43,11 +43,10 @@ namespace tdc::lz77 {
         const uint MIN_LOOKAHEAD;
         uint DS_SIZE; // should be const but it might change if the stream is too small. (edge case..)
 
-        #ifdef STATS_ENABLED
+
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
         std::streampos streampos = 0;
-        #endif
 
     public:
         inline static Meta meta() {
@@ -66,7 +65,7 @@ namespace tdc::lz77 {
                                                         WINDOW_SIZE(1 << HASH_BITS),
                                                         MIN_LOOKAHEAD(WINDOW_SIZE),
                                                         DS_SIZE((int) ((1 + ALPHA) * WINDOW_SIZE)) {
-            #ifdef STATS_ENABLED
+            #ifdef FACTORS_ENABLED
             fac = &factors;
             #endif
 
@@ -97,12 +96,6 @@ namespace tdc::lz77 {
 
         [[gnu::hot]]
         inline void compress(Input &input, Output &output) override {
-            window = new char[DS_SIZE];
-            suffixArray = new int[DS_SIZE];
-            inverseSuffixArray = new int[DS_SIZE];
-            lcpArray = new int[DS_SIZE];
-
-            StatPhase root("Root"); // causes valgrind problems.
 
             auto coder = lz77_coder(this->config().sub_config("coder")).encoder(output, NoLiterals());
             coder.factor_length_range(Range(MIN_MATCH, WINDOW_SIZE)); // TODO check if WINDOW_SIZE is enough.
@@ -127,11 +120,18 @@ namespace tdc::lz77 {
             // isLastBlock equals true, when the stream reached EOF, gcount returned 0 and lookahead > 0
             bool eof = false;
 
-            // initialize window
-            stream.read(&window[0], DS_SIZE);
-            lookahead = stream.gcount();
+            StatPhase root("Root"); // causes valgrind problems.
 
-            StatPhase::wrap("Init Hashes", [&] {
+            StatPhase::wrap("Init", [&] {
+                window = new char[DS_SIZE];
+                suffixArray = new int[DS_SIZE];
+                inverseSuffixArray = new int[DS_SIZE];
+                lcpArray = new int[DS_SIZE];
+
+                // initialize window
+                stream.read(&window[0], DS_SIZE);
+                lookahead = stream.gcount();
+
                 initDatastructures(lookahead);
             });
 
@@ -223,9 +223,6 @@ namespace tdc::lz77 {
                     }
 
                     if (readBytes > 0) {
-                        if (readBytes != ALPHA * WINDOW_SIZE) {
-                            std::cout << "check";
-                        }
                         lookahead = readBytes;
                         initDatastructures(WINDOW_SIZE + lookahead);
                         position = WINDOW_SIZE;
@@ -233,16 +230,13 @@ namespace tdc::lz77 {
                         eof = true;
                     }
                 }
+                delete[] window;
+                delete[] suffixArray;
+                delete[] inverseSuffixArray;
+                delete[] lcpArray;
             });
 
-            #ifdef STATS_ENABLED
             LZ77Helper::printStats(input, root, streampos, factors, WINDOW_SIZE);
-            #endif
-
-            delete[] window;
-            delete[] suffixArray;
-            delete[] inverseSuffixArray;
-            delete[] lcpArray;
         }
 
         [[gnu::always_inline]]
@@ -267,7 +261,7 @@ namespace tdc::lz77 {
         [[gnu::always_inline]]
         inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
             cod.encode_factor(lzss::Factor(0, offset, length));
-            #ifdef STATS_ENABLED
+            #ifdef FACTORS_ENABLED
             fac->emplace_back(streampos, offset, length);
             streampos+=length;
             #endif
@@ -290,7 +284,7 @@ namespace tdc::lz77 {
         inline void
         addLiteral(uliteral_t literal, auto &coder) {
             coder.encode_literal(literal);
-            #ifdef STATS_ENABLED
+            #ifdef FACTORS_ENABLED
             streampos+=1;
             #endif
         }

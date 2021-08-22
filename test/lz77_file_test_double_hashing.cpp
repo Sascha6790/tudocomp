@@ -54,7 +54,7 @@ void decompressFile(const char *fileIn, const char *fileOut, std::string options
 
 std::string getOptions(uint bits, uint mode) {
     std::ostringstream options;
-    options << "HASH_BITS=" << bits;
+    options << "HASH_BITS=" << bits << ",COMPRESSION_MODE=" << mode;
     return std::string(options.str());
 }
 
@@ -100,10 +100,36 @@ TEST(DoulbeHashing, MODE_1_Binary) {
                                    getOptions(bits, mode));
 }
 
-TEST(DoulbeHashing, MODE_1) {
-    uint bits = 15;
-    uint mode = 1;
+TEST(DoulbeHashing, MODE_2_) {
+    uint bits = 16;
+    uint mode = 2;
     std::string filename = "wiki_all_vital.txt.1MB";
+
+    compressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    EliasDeltaCoder,
+                    EliasDeltaCoder,
+                    EliasDeltaCoder>>>(getInput(filename).c_str(),
+                                       getOutput(filename, bits, mode, "elias.compressed").c_str(),
+                                       getOptions(bits, mode));
+}
+TEST(DoulbeHashing, MODE_2_DECOMPRESS) {
+    uint bits = 16;
+    uint mode = 2;
+    std::string filename = "wiki_all_vital.txt.1MB";
+    decompressFile<lz77::LZ77DoubleHashing<
+            lz77::LZ77StreamingCoder<
+                    EliasDeltaCoder,
+                    EliasDeltaCoder,
+                    EliasDeltaCoder>>>(getOutput(filename, bits, mode, "elias.compressed").c_str(),
+                                       getOutput(filename, bits, mode, "elias.decompressed").c_str(),
+                                       getOptions(bits, mode));
+}
+
+TEST(DoulbeHashing, ecoli16bit) {
+    uint bits = 16;
+    uint mode = 1;
+    std::string filename = "E.coli";
 
     compressFile<lz77::LZ77DoubleHashing<
             lz77::LZ77StreamingCoder<
@@ -116,6 +142,7 @@ TEST(DoulbeHashing, MODE_1) {
 
 TEST(DoulbeHashing, MODE_2) {
     uint bits = 15;
+
     uint mode = 2;
     std::string filename = "wiki_all_vital.txt.1MB";
 
@@ -128,19 +155,6 @@ TEST(DoulbeHashing, MODE_2) {
                                        getOptions(bits, mode));
 }
 
-
-TEST(DoulbeHashing, MODE_1_DECOMPRESS) {
-    uint bits = 15;
-    uint mode = 1;
-    std::string filename = "wiki_all_vital.txt.1MB";
-    decompressFile<lz77::LZ77DoubleHashing<
-            lz77::LZ77StreamingCoder<
-                    EliasDeltaCoder,
-                    EliasDeltaCoder,
-                    EliasDeltaCoder>>>(getOutput(filename, bits, mode, "elias.compressed").c_str(),
-                                       getOutput(filename, bits, mode, "elias.decompressed").c_str(),
-                                       getOptions(bits, mode));
-}
 
 
 TEST(DoulbeHashing, MODE_2_DECOMPRESS) {

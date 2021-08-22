@@ -32,20 +32,23 @@ namespace tdc::lz77 {
 
     private:
 
-        const size_t minFactorLength;
+        const uint HASH_BITS;
         const size_t windowSize;
 
-
         int i, j, h;
-        const int dsSize, bufSize;
-        const int MIN_MATCH = 3;
+        const int dsSize;
+        const int MIN_MATCH;
 
-        #ifdef STATS_ENABLED
+
         std::streampos streamPos = 0;
         lzss::FactorBufferRAM factors;
         lzss::FactorBufferRAM *fac;
-        #endif
+
     public:
+        enum MATCH_TYPE {
+            LITERAL, A_GREATER, B_GREATER
+        };
+
         class DS {
         public:
             int *suffixArray;
@@ -54,40 +57,67 @@ namespace tdc::lz77 {
             char *buffer;
             char *first;
             char *second;
-            uint gcount;
-            int dsSize;
-            int windowSize;
+            uint sizeSecondBuffer;
+            uint totalSize;
+            uint windowSize;
             CappedWeightedSuffixTree<unsigned int> *wst;
 
+            // Only used for the first bytes of a stream.
+            // saves one memcpy
+            DS(int windowSize, std::istream &stream) {
+                initialize(windowSize);
+                stream.read(&buffer[0], windowSize);
+                windowSize = stream.gcount();
+                readStream(windowSize, stream);
+                constructWst();
+            }
+
             DS(int windowSize, const char *bufferW1, std::istream &stream) {
-                // dsSize might change (end of stream)
-                dsSize = 2 * windowSize;
+                initialize(windowSize);
+                copyBuffer(windowSize, bufferW1);
+                readStream(windowSize, stream);
+                constructWst();
+            }
 
+            [[gnu::always_inline]]
+            inline void constructWst() {
+                constructSuffixArray(buffer, suffixArray, totalSize);
+                constructInverseSuffixArray(suffixArray, inverseSuffixArray, totalSize);
+                constructLcpArray(buffer, suffixArray, inverseSuffixArray, lcpArray, totalSize);
 
-                buffer = new char[dsSize];
-                suffixArray = new int[dsSize];
-                inverseSuffixArray = new int[dsSize];
-                lcpArray = new int[dsSize];
+                wst = new CappedWeightedSuffixTree<unsigned int>(lcpArray,
+                                                                 suffixArray,
+                                                                 buffer,
+                                                                 totalSize,
+                                                                 windowSize);
+            }
 
-                memcpy(&this->buffer[0], bufferW1, windowSize);
+            [[gnu::always_inline]]
+            inline void readStream(int windowSize, std::istream &stream) {
                 stream.read(&buffer[windowSize], windowSize);
 
                 // update dsSize and windowSize on partially read windows (end of stream)
-                gcount = stream.gcount();
-                dsSize = windowSize + gcount;
-                this->windowSize = dsSize / 2;
+                sizeSecondBuffer = stream.gcount();
+                totalSize = windowSize + sizeSecondBuffer;
+                DS::windowSize = totalSize / 2;
+                sizeSecondBuffer = totalSize - DS::windowSize;
 
-                first = &this->buffer[0];
-                second = &this->buffer[windowSize];
+                first = &buffer[0];
+                second = &buffer[DS::windowSize];
+            }
 
+            [[gnu::always_inline]]
+            inline void copyBuffer(int windowSize, const char *bufferW1) const {
+                memcpy(&buffer[0], bufferW1, windowSize);
+            }
 
-                constructSuffixArray(buffer, suffixArray, dsSize);
-                constructInverseSuffixArray(suffixArray, inverseSuffixArray, dsSize);
-                constructLcpArray(buffer, suffixArray, inverseSuffixArray, lcpArray, dsSize);
-
-                wst = new CappedWeightedSuffixTree<unsigned int>(lcpArray, suffixArray, buffer, dsSize,
-                                                                 this->windowSize);
-
+            [[gnu::always_inline]]
+            inline void initialize(int windowSize) {
+                totalSize = 2 * windowSize;
+                buffer = new char[totalSize];
+                suffixArray = new int[totalSize];
+                inverseSuffixArray = new int[totalSize];
+                lcpArray = new int[totalSize];
             }
 
             virtual ~DS() {
@@ -108,6 +138,7 @@ namespace tdc::lz77 {
 
             [[gnu::always_inline]]
             inline static void constructSuffixArray(const char *buffer, int *suffixArray, uint size) {
+                assert(size > 0);
                 divsufsort(reinterpret_cast<const sauchar_t *> (buffer), suffixArray, size);
             }
 
@@ -139,8 +170,8 @@ namespace tdc::lz77 {
         inline static Meta meta() {
             Meta m(Compressor::type_desc(), "LZ77CompactTries", "Compute LZ77 Factors using Compact Tries");
             m.param("coder", "The output encoder.").strategy<lz77_coder>(TypeDesc("lzss_coder"));
-            m.param("window", "The sliding window size").primitive(16);
-            m.param("threshold", "The minimum factor length.").primitive(2);
+            m.param("HASH_BITS", "dictionary of size 2^HASH_BITS").primitive(3);
+            m.param("MIN_MATCH", "The minimum factor length.").primitive(3);
             m.inherit_tag<lz77_coder>(tags::lossy);
             return m;
         }
@@ -148,12 +179,12 @@ namespace tdc::lz77 {
         inline LZ77CompactTries() = delete;
 
         inline explicit LZ77CompactTries(Config &&c) : Compressor(std::move(c)),
-                                                       minFactorLength(this->config().param("threshold").as_uint()),
-                                                       windowSize(this->config().param("window").as_uint()),
+                                                       HASH_BITS(this->config().param("HASH_BITS").as_uint()),
+                                                       MIN_MATCH(this->config().param("MIN_MATCH").as_uint()),
+                                                       windowSize(1 << HASH_BITS),
                                                        dsSize(2 * windowSize),
-                                                       bufSize(3 * windowSize),
                                                        i(0), j(0), h(0) {
-            #ifdef STATS_ENABLED
+            #ifdef FACTORS_ENABLED
             fac = &factors;
             #endif
             // Divide Text S into blocks of length w
@@ -162,125 +193,135 @@ namespace tdc::lz77 {
             // Having a Patricia Tree with a static suffix length requires to build a Patricia Tree with an input of size 2w and truncating each suffix at length w
             // This requires a look ahead of length w. block 1 uses block 2 as look-ahead buffer
             // | ---- block 1 ---- | ---- block 2 ---- | ---- l-ahead ---- |
-            // Since we don't want to deal with three buffers, we'll just use one buffer with a size of 3w.
         }
 
         [[gnu::hot]]
         inline void compress(Input &input, Output &output) override {
-            StatPhase root("Root"); // causes valgrind problems.
             // initialize encoder
             auto coder = lz77_coder(this->config().sub_config("coder")).encoder(output, NoLiterals());
             // cod = &coder;
-            coder.factor_length_range(Range(1, 2 * windowSize));
+            coder.factor_length_range(Range(MIN_MATCH, dsSize));
             coder.encode_header();
 
             tdc::io::InputStream stream = input.as_stream();
 
-            char *buffer = new char[bufSize];
+            char *initialBuffer;
             unsigned int offset = 0;
             unsigned int blockAMaxLabel = 0;
             unsigned int blockAMatchedChars = 0;
             unsigned int blockBMaxLabel = 0;
             unsigned int blockBMatchedChars = 0;
+            unsigned int length = 0;
 
             DS *blockA;
             DS *blockB;
-            StatPhase::wrap("Factorize Start", [&] { // caused valgrind problems.
-                // handle start of stream
-                if (stream.good()) {
-                    stream.read(&buffer[0], windowSize);
 
-                    StatPhase::wrap("blockA", [&] { // caused valgrind problems.
-                        blockA = new DS(windowSize, &buffer[0], stream);
-                    });
+            StatPhase root("Root"); // causes valgrind problems.
 
-                    while (offset < blockA->windowSize) {
-                        auto node = getEdge(blockA, blockA->buffer, offset, blockAMaxLabel, blockAMatchedChars,
-                                            [](WeightedNode<uint> *node, uint index) {
-                                                return node->minLabel < index;
-                                            });
-                        if (blockAMatchedChars > 0) {
-                            addFactor(offset - node->minLabel, blockAMatchedChars, coder);
-                            offset += blockAMatchedChars;
-                        } else {
-                            addLiteral(buffer[offset], coder);
-                            ++offset;
-                        }
+            // StatPhase::wrap("Factorize Start", [&] { // caused valgrind problems.
 
-                    }
+            // handle start of stream
+            if (stream.good()) {
+                blockA = new DS(windowSize, stream);
 
-                    offset -= blockA->windowSize;
-                }
-            });
-            StatPhase::wrap("Factorize Middle", [&] { // caused valgrind problems.
-                // handle middle of stream
-                int middleSubPhase = 0;
-                while (stream.good()) {
-                    blockB = new DS(windowSize, blockA->second, stream);
-                    while (offset < windowSize) {
-                        // optimized call to Comparator by templating, typedef and lambda call
-                        auto nodeA = getEdge(blockA, blockB->buffer, offset, blockAMaxLabel, blockAMatchedChars,
-                                             [](WeightedNode<uint> *node, uint index) {
-                                                 return node->maxLabel >= index;
-                                             });
-                        auto nodeB = getEdge(blockB, blockB->buffer, offset, blockBMaxLabel, blockBMatchedChars,
-                                             [](WeightedNode<uint> *node, uint index) {
-                                                 return node->minLabel < index;
-                                             });
-                        if (blockAMatchedChars <= blockBMatchedChars) {
-                            if (blockBMatchedChars == 0) [[unlikely]] {
-                                addLiteral(blockA->second[offset], coder);
-                                ++offset;
-                            } else {
-                                // minLabel is within second window => offset - nodeB->minLabel
-                                addFactor(offset - nodeB->minLabel, blockBMatchedChars,
-                                          coder);
-                                offset += blockBMatchedChars;
-                            }
-                        } else [[likely]] {
-                            // minLabel is within first window => windowSize - nodeA->maxLabel + offset
-                            addFactor(windowSize - nodeA->maxLabel + offset, blockAMatchedChars,
-                                      coder);
-                            offset += blockAMatchedChars;
+                while (offset < blockA->windowSize) {
+                    auto node = getEdge(blockA, blockA->buffer, offset, blockA->windowSize, blockAMaxLabel,
+                                        blockAMatchedChars,
+                                        [](WeightedNode<uint> *node, uint index) {
+                                            return node->minLabel < index;
+                                        });
+                    switch (getMatchType(blockAMatchedChars, 0)) {
+                        case A_GREATER:
+                        case B_GREATER:
+                            length = blockAMatchedChars;
+                            addFactor(offset - node->minLabel, length, coder, &blockA->buffer[offset]);
+                            break;
+                        case LITERAL: {
+                            length = std::max(1U, blockAMatchedChars);
+                            addLiteralWord(&blockA->buffer[offset], length, coder);
+                            break;
                         }
                     }
-                    offset -= windowSize;
-                    delete blockA;
-                    blockA = blockB;
+                    offset += length;
                 }
-            });
-            StatPhase::wrap("Factorize End", [&] { // caused valgrind problems.
-                // handle end of stream
-                if (blockA->windowSize != windowSize && blockA->gcount > 0) {
-                    offset = 0;
-                    // we only parse one block which has exacly gcount chars in blockA->second.
-                    // we compare pos < windowSize in getEdge and thus have to set windowSize for the last block to gcount.
-                    blockA->windowSize = blockA->gcount;
-                    while (offset < blockA->gcount) { // TODO check gcount.
-                        auto node = getEdge(blockA, blockA->second, offset, blockAMaxLabel, blockAMatchedChars,
-                                            [](WeightedNode<uint> *node, uint index) { return true; });
-                        if (blockAMatchedChars > 0) {
-                            addFactor(windowSize - node->maxLabel + offset, blockAMatchedChars, coder);
-                            offset += blockAMatchedChars;
-                        } else {
-                            addLiteral(blockA->second[offset], coder);
-                            ++offset;
-                        }
 
+                offset -= blockA->windowSize;
+            }
+            // });
+            // StatPhase::wrap("Factorize Middle", [&] { // caused valgrind problems.
+            // handle middle of stream
+            while (stream.good()) {
+                blockB = new DS(stream.gcount(), blockA->second, stream);
+                while (offset < blockB->windowSize) {
+                    // optimized call to Comparator by templating, typedef and lambda call
+                    auto nodeA = getEdge(blockA, blockB->buffer, offset, blockB->windowSize, blockAMaxLabel,
+                                         blockAMatchedChars,
+                                         [](WeightedNode<uint> *node, uint index) {
+                                             return node->maxLabel >= index;
+                                         });
+                    auto nodeB = getEdge(blockB, blockB->buffer, offset, blockB->windowSize, blockBMaxLabel,
+                                         blockBMatchedChars,
+                                         [](WeightedNode<uint> *node, uint index) {
+                                             return node->minLabel < index;
+                                         });
+
+                    switch (getMatchType(blockAMatchedChars, blockBMatchedChars)) {
+                        case A_GREATER:
+                            length = blockAMatchedChars;
+                            addFactor(windowSize - nodeA->maxLabel + offset, length, coder, &blockA->second[offset]);
+                            break;
+                        case B_GREATER:
+                            length = blockBMatchedChars;
+                            addFactor(offset - nodeB->minLabel, length, coder, &blockA->second[offset]);
+                            break;
+                        case LITERAL: {
+                            length = std::max(1U, std::max(blockAMatchedChars, blockBMatchedChars));
+                            addLiteralWord(&blockA->second[offset], length, coder);
+                            break;
+                        }
                     }
+                    offset += length;
                 }
-                // cleanup
-                delete[] buffer;
+                offset -= windowSize;
                 delete blockA;
-            });
+                blockA = blockB;
+            }
+            // windowSize gelesen, blockA->windowSize übrig
+            // });
+            // StatPhase::wrap("Factorize End", [&] { // caused valgrind problems.
+            // handle end of stream
+
+
+            if (blockA->windowSize != windowSize && blockA->sizeSecondBuffer > 0) {
+                offset = 0;
+
+                while (offset < blockA->sizeSecondBuffer) {
+                    auto node = getEdge(blockA, blockA->second, offset, blockA->windowSize, blockAMaxLabel,
+                                        blockAMatchedChars,
+                                        [](WeightedNode<uint> *node, uint index) { return true; });
+
+                    switch (getMatchType(blockAMatchedChars, 0)) {
+                        case A_GREATER:
+                        case B_GREATER:
+                            length = blockAMatchedChars;
+                            addFactor(blockA->windowSize - node->maxLabel + offset, length, coder,
+                                      &blockA->second[offset]);
+                            break;
+                        case LITERAL: {
+                            length = std::max(1U, blockAMatchedChars);
+                            addLiteralWord(&blockA->second[offset], length, coder);
+                            break;
+                        }
+                    }
+                    offset += length;
+                }
+            }
+            // cleanup
+            delete blockA;
+            // });
             // delete blockB; // not needed because we swap pointers above and delete B there.
 
-
-            #ifdef STATS_ENABLED
             LZ77Helper::printStats(input, root, streamPos, factors, windowSize);
-            #endif
-            // stats
-
         }
 
         [[gnu::always_inline]]
@@ -293,17 +334,17 @@ namespace tdc::lz77 {
         [[gnu::always_inline]]
         inline void addLiteral(uliteral_t literal, auto &cod) {
             cod.encode_literal(literal);
-            #ifdef STATS_ENABLED
+            #ifdef FACTORS_ENABLED
             streamPos += 1;
             #endif
         }
 
         [[gnu::always_inline]]
-        inline void addFactor(unsigned int offset, unsigned int length, auto &cod) {
+        inline void addFactor(unsigned int offset, unsigned int length, auto &cod, char *buffer) {
             cod.encode_factor(lzss::Factor(0, offset, length));
-            #ifdef STATS_ENABLED
-            streamPos += length;
+            #ifdef FACTORS_ENABLED
             fac->emplace_back(streamPos, offset, length);
+            streamPos += length;
             #endif
         }
 
@@ -313,6 +354,7 @@ namespace tdc::lz77 {
         WeightedNode<unsigned int> *getEdge(const DS *treeStruct,
                                             const char *textToProcess,
                                             unsigned int pos,
+                                            unsigned int maxPos,
                                             unsigned int &maxLabel,
                                             unsigned int &matchedChars,
                                             Comparator comparator) const {
@@ -323,7 +365,7 @@ namespace tdc::lz77 {
             WeightedNode<uint> *currentNode = treeStruct->wst->getRoot();
             // iterate over second block, start with first char of second block.
             unsigned int startPos = pos;
-            while (pos < treeStruct->windowSize) {
+            while (pos < maxPos) {
                 // get next node and process matching chars later.
                 auto nodeIterator = currentNode->childNodes.find(textToProcess[pos]);
                 // check if there is no child starting with the required char.
@@ -337,7 +379,7 @@ namespace tdc::lz77 {
                     // compare edge[0...] with buffer[t..] and increment t by the number of matched chars.
                     for (int edgePos = 0; edgePos < currentNode->edgeLabelLength; edgePos++) {
                         // check if currentPos is too big. (only happens at the end of the stream if the windowSize decreases.)
-                        if (treeStruct->windowSize == pos || textToProcess[pos++] != currentNode->edgeLabel[edgePos]) {
+                        if (maxPos == pos || textToProcess[pos++] != currentNode->edgeLabel[edgePos]) {
                             // edge[0...edgeLength] was not completely matched by buffer[t..]
                             return currentNode;
                         }
@@ -354,6 +396,17 @@ namespace tdc::lz77 {
 
         [[nodiscard]] inline std::unique_ptr<Decompressor> decompressor() const override {
             return Algorithm::instance<LZSSDecompressor<lz77_coder>>();
+        }
+
+        [[gnu::always_inline]]
+        inline MATCH_TYPE getMatchType(uint a, uint b) {
+            if (a < MIN_MATCH) {
+                if (b < MIN_MATCH) {
+                    return MATCH_TYPE::LITERAL;
+                }
+                return MATCH_TYPE::B_GREATER;
+            }
+            return a > b ? MATCH_TYPE::A_GREATER : MATCH_TYPE::B_GREATER;// a == b will be treated as B_GREATER.
         }
     };
 } //ns

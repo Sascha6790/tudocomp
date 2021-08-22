@@ -140,10 +140,15 @@ namespace tdc::lz77 {
         }
 
         void destructPointers(WeightedNode<T> *parent) {
+            if(parent == nullptr) {
+                return;
+            }
             auto itr = parent->childNodes.begin();
             while (itr != parent->childNodes.end()) {
-                destructPointers(itr->second);
-                delete (itr->second);
+                if(itr->second != nullptr) {
+                    destructPointers(itr->second);
+                    delete (itr->second);
+                }
                 itr = parent->childNodes.erase(itr);
             }
         }
