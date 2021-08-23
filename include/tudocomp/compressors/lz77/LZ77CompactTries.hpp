@@ -216,109 +216,102 @@ namespace tdc::lz77 {
             DS *blockA;
             DS *blockB;
 
-            StatPhase root("Root"); // causes valgrind problems.
+            StatPhase root("Root");
 
-            // StatPhase::wrap("Factorize Start", [&] { // caused valgrind problems.
+            StatPhase::wrap("Factorize Start", [&] {
+                if (stream.good()) {
+                    blockA = new DS(windowSize, stream);
 
-            // handle start of stream
-            if (stream.good()) {
-                blockA = new DS(windowSize, stream);
-
-                while (offset < blockA->windowSize) {
-                    auto node = getEdge(blockA, blockA->buffer, offset, blockA->windowSize, blockAMaxLabel,
-                                        blockAMatchedChars,
-                                        [](WeightedNode<uint> *node, uint index) {
-                                            return node->minLabel < index;
-                                        });
-                    switch (getMatchType(blockAMatchedChars, 0)) {
-                        case A_GREATER:
-                        case B_GREATER:
-                            length = blockAMatchedChars;
-                            addFactor(offset - node->minLabel, length, coder, &blockA->buffer[offset]);
-                            break;
-                        case LITERAL: {
-                            length = std::max(1U, blockAMatchedChars);
-                            addLiteralWord(&blockA->buffer[offset], length, coder);
-                            break;
+                    while (offset < blockA->windowSize) {
+                        auto node = getEdge(blockA, blockA->buffer, offset, blockA->windowSize, blockAMaxLabel,
+                                            blockAMatchedChars,
+                                            [](WeightedNode<uint> *node, uint index) {
+                                                return node->minLabel < index;
+                                            });
+                        switch (getMatchType(blockAMatchedChars, 0)) {
+                            case A_GREATER:
+                            case B_GREATER:
+                                length = blockAMatchedChars;
+                                addFactor(offset - node->minLabel, length, coder, &blockA->buffer[offset]);
+                                break;
+                            case LITERAL: {
+                                length = std::max(1U, blockAMatchedChars);
+                                addLiteralWord(&blockA->buffer[offset], length, coder);
+                                break;
+                            }
                         }
+                        offset += length;
                     }
-                    offset += length;
+
+                    offset -= blockA->windowSize;
                 }
+            });
+            StatPhase::wrap("Factorize Middle", [&] {
+                while (stream.good()) {
+                    blockB = new DS(stream.gcount(), blockA->second, stream);
+                    while (offset < blockB->windowSize) {
+                        // optimized call to Comparator by templating, typedef and lambda call
+                        auto nodeA = getEdge(blockA, blockB->buffer, offset, blockB->windowSize, blockAMaxLabel,
+                                             blockAMatchedChars,
+                                             [](WeightedNode<uint> *node, uint index) {
+                                                 return node->maxLabel >= index;
+                                             });
+                        auto nodeB = getEdge(blockB, blockB->buffer, offset, blockB->windowSize, blockBMaxLabel,
+                                             blockBMatchedChars,
+                                             [](WeightedNode<uint> *node, uint index) {
+                                                 return node->minLabel < index;
+                                             });
 
-                offset -= blockA->windowSize;
-            }
-            // });
-            // StatPhase::wrap("Factorize Middle", [&] { // caused valgrind problems.
-            // handle middle of stream
-            while (stream.good()) {
-                blockB = new DS(stream.gcount(), blockA->second, stream);
-                while (offset < blockB->windowSize) {
-                    // optimized call to Comparator by templating, typedef and lambda call
-                    auto nodeA = getEdge(blockA, blockB->buffer, offset, blockB->windowSize, blockAMaxLabel,
-                                         blockAMatchedChars,
-                                         [](WeightedNode<uint> *node, uint index) {
-                                             return node->maxLabel >= index;
-                                         });
-                    auto nodeB = getEdge(blockB, blockB->buffer, offset, blockB->windowSize, blockBMaxLabel,
-                                         blockBMatchedChars,
-                                         [](WeightedNode<uint> *node, uint index) {
-                                             return node->minLabel < index;
-                                         });
-
-                    switch (getMatchType(blockAMatchedChars, blockBMatchedChars)) {
-                        case A_GREATER:
-                            length = blockAMatchedChars;
-                            addFactor(windowSize - nodeA->maxLabel + offset, length, coder, &blockA->second[offset]);
-                            break;
-                        case B_GREATER:
-                            length = blockBMatchedChars;
-                            addFactor(offset - nodeB->minLabel, length, coder, &blockA->second[offset]);
-                            break;
-                        case LITERAL: {
-                            length = std::max(1U, std::max(blockAMatchedChars, blockBMatchedChars));
-                            addLiteralWord(&blockA->second[offset], length, coder);
-                            break;
+                        switch (getMatchType(blockAMatchedChars, blockBMatchedChars)) {
+                            case A_GREATER:
+                                length = blockAMatchedChars;
+                                addFactor(windowSize - nodeA->maxLabel + offset, length, coder,
+                                          &blockA->second[offset]);
+                                break;
+                            case B_GREATER:
+                                length = blockBMatchedChars;
+                                addFactor(offset - nodeB->minLabel, length, coder, &blockA->second[offset]);
+                                break;
+                            case LITERAL: {
+                                length = std::max(1U, std::max(blockAMatchedChars, blockBMatchedChars));
+                                addLiteralWord(&blockA->second[offset], length, coder);
+                                break;
+                            }
                         }
+                        offset += length;
                     }
-                    offset += length;
+                    offset -= windowSize;
+                    delete blockA;
+                    blockA = blockB;
                 }
-                offset -= windowSize;
+            });
+            StatPhase::wrap("Factorize End", [&] {
+                if (blockA->windowSize != windowSize && blockA->sizeSecondBuffer > 0) {
+                    offset = 0;
+
+                    while (offset < blockA->sizeSecondBuffer) {
+                        auto node = getEdge(blockA, blockA->second, offset, blockA->windowSize, blockAMaxLabel,
+                                            blockAMatchedChars,
+                                            [](WeightedNode<uint> *node, uint index) { return true; });
+
+                        switch (getMatchType(blockAMatchedChars, 0)) {
+                            case A_GREATER:
+                            case B_GREATER:
+                                length = blockAMatchedChars;
+                                addFactor(blockA->windowSize - node->maxLabel + offset, length, coder,
+                                          &blockA->second[offset]);
+                                break;
+                            case LITERAL: {
+                                length = std::max(1U, blockAMatchedChars);
+                                addLiteralWord(&blockA->second[offset], length, coder);
+                                break;
+                            }
+                        }
+                        offset += length;
+                    }
+                }
                 delete blockA;
-                blockA = blockB;
-            }
-            // windowSize gelesen, blockA->windowSize übrig
-            // });
-            // StatPhase::wrap("Factorize End", [&] { // caused valgrind problems.
-            // handle end of stream
-
-
-            if (blockA->windowSize != windowSize && blockA->sizeSecondBuffer > 0) {
-                offset = 0;
-
-                while (offset < blockA->sizeSecondBuffer) {
-                    auto node = getEdge(blockA, blockA->second, offset, blockA->windowSize, blockAMaxLabel,
-                                        blockAMatchedChars,
-                                        [](WeightedNode<uint> *node, uint index) { return true; });
-
-                    switch (getMatchType(blockAMatchedChars, 0)) {
-                        case A_GREATER:
-                        case B_GREATER:
-                            length = blockAMatchedChars;
-                            addFactor(blockA->windowSize - node->maxLabel + offset, length, coder,
-                                      &blockA->second[offset]);
-                            break;
-                        case LITERAL: {
-                            length = std::max(1U, blockAMatchedChars);
-                            addLiteralWord(&blockA->second[offset], length, coder);
-                            break;
-                        }
-                    }
-                    offset += length;
-                }
-            }
-            // cleanup
-            delete blockA;
-            // });
+            });
             // delete blockB; // not needed because we swap pointers above and delete B there.
 
             LZ77Helper::printStats(input, root, streamPos, factors, windowSize);
