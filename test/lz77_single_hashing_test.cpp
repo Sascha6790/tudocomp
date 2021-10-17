@@ -85,3 +85,36 @@ TEST(COMPRESSION_MODE_TEST, MODE_2) {
                                                                                                                         "HASH_BITS=8, COMPRESSION_MODE=2");
     result.assert_decompress();
 }
+
+TEST(HASH_TEST, MODE_2) {
+    const int hashTableSize = 20;
+
+    uint * hashTableHead = new uint[hashTableSize];
+    uint * hashTablePrev = new uint[hashTableSize];
+    memset(hashTableHead, 0, sizeof(uint) * hashTableSize);
+    memset(hashTablePrev, 0, sizeof(uint) * hashTableSize);
+
+    const std::string input = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.";
+    std::cout << "Länge der Eingabe: "<< input.length() << std::endl;
+    std::cout << "Hash table:" << std::endl;
+
+    uint MIN_MATCH = 3;
+    uint length = input.size();
+    const uint maxLen = length - MIN_MATCH;
+    uint hashHead;
+    uint HASH_MASK = hashTableSize - 1;
+    uint HASH_BITS = 9;
+    uint H_SHIFT = (HASH_BITS + MIN_MATCH - 1) / MIN_MATCH;
+    for(int positionInText = 0; positionInText < maxLen; positionInText++){
+        hashHead = 0;
+        for (uint j = 0; j < MIN_MATCH; j++) {
+            hashHead = ((hashHead << H_SHIFT) ^ input[j + positionInText]) & HASH_MASK;
+        }
+        hashTablePrev[positionInText & HASH_MASK] = hashTableHead[hashHead];
+        hashTableHead[hashHead] = positionInText;
+    }
+
+    for(int i = 0; i < hashTableSize; i++) {
+        std::cout << "hashTable[i]=" << hashTableHead[i] << std::endl;
+    }
+}

@@ -40,7 +40,7 @@ namespace tdc::lz77 {
                 }
                 WeightedNode<T> *deepestNode = this->rightmostLeaf;
 
-                while (!isDeepestNode(deepestNode)) {
+                while (isNotDeepestNode(deepestNode)) {
                     deepestNode = deepestNode->parent;
                 }
 
@@ -196,8 +196,8 @@ namespace tdc::lz77 {
         }
 
         [[gnu::always_inline]]
-        inline bool isDeepestNode(WeightedNode<T> *node) {
-            return node->depth <= std::min(lcpArray[currentIteration], window);
+        inline bool isNotDeepestNode(WeightedNode<T> *node) {
+            return node->depth > lcpArray[currentIteration];
         }
 
         [[gnu::always_inline]]

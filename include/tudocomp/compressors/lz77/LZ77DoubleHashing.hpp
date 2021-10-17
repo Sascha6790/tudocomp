@@ -214,7 +214,6 @@ namespace tdc::lz77 {
                                     maxMatchPos = startOfMatch; //TODO +1 removed.
                                     assert(maxMatchPos != NOT_SET);
                                 }
-
                             }
                             if (maxMatchCount >= maxLen) {
                                 break;
